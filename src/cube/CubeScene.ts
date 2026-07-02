@@ -21,11 +21,17 @@ export class CubeScene {
   private initialVisibleFaces: Set<FaceKey> = new Set();
   private forcedFaces: Set<FaceKey> = new Set();
   private lastMoveWasL = false;     // tracks L→L' sequence for Phase 2
+  private faceNormals: Record<FaceKey, THREE.Vector3> = {
+    U: new THREE.Vector3(0, 1, 0),
+    D: new THREE.Vector3(0, -1, 0),
+    F: new THREE.Vector3(0, 0, 1),
+    B: new THREE.Vector3(0, 0, -1),
+    L: new THREE.Vector3(-1, 0, 0),
+    R: new THREE.Vector3(1, 0, 0),
+  };
 
   onForceActiveChange?: (active: boolean) => void;
 
-  // Expose forceState for render loop
-  get forceState() { return this.forceModeActive; }
   isPhase1Completed() { return this.phase1Completed; }
   setPhase1Completed(val: boolean) { this.phase1Completed = val; }
 
@@ -117,7 +123,7 @@ export class CubeScene {
       this.cube.tickDragSmoothing();
 
       // Force mode: check if initially visible faces have become hidden
-      if (this.forceModeActive && this.forceState) {
+      if (this.forceModeActive) {
         this.checkAndForceNewlyHidden();
       }
 
@@ -185,6 +191,17 @@ export class CubeScene {
 
   // ─── Force Mode ──────────────────────────────────────────────
 
+  /** Clear force snapshot and reset all force state */
+  clearForceSnapshot() {
+    this.forceSnapshot = null;
+    this.forceModeActive = false;
+    this.phase1Completed = false;
+    this.lastMoveWasL = false;
+    this.initialVisibleFaces.clear();
+    this.forcedFaces.clear();
+    this.onForceActiveChange?.(false);
+  }
+
   /** Store complete cube snapshot */
   setForceSnapshot() {
     this.forceSnapshot = this.cube.takeForceSnapshot();
@@ -251,21 +268,10 @@ export class CubeScene {
 
     const camForward = new THREE.Vector3(0, 0, -1).transformDirection(this.camera.matrixWorld).normalize();
 
-    const faceNormals: Record<FaceKey, THREE.Vector3> = {
-      U: new THREE.Vector3(0, 1, 0),
-      D: new THREE.Vector3(0, -1, 0),
-      F: new THREE.Vector3(0, 0, 1),
-      B: new THREE.Vector3(0, 0, -1),
-      L: new THREE.Vector3(-1, 0, 0),
-      R: new THREE.Vector3(1, 0, 0),
-    };
-
     const result: Record<FaceKey, boolean> = {} as any;
 
-    for (const [face, localNormal] of Object.entries(faceNormals)) {
+    for (const [face, localNormal] of Object.entries(this.faceNormals)) {
       const worldNormal = localNormal.clone().transformDirection(this.cubeGroup.matrixWorld).normalize();
-      // Face is VISIBLE if its normal points toward camera (opposite to camera forward)
-      // dot < 0 means they face each other
       result[face as FaceKey] = worldNormal.dot(camForward) < 0;
     }
 
@@ -292,6 +298,10 @@ export class CubeScene {
 
       // Force complete - all 6 faces now have force colors
       this.forceModeActive = false;
+      this.phase1Completed = false;
+      this.initialVisibleFaces.clear();
+      this.forcedFaces.clear();
+      this.lastMoveWasL = false;
       this.onForceActiveChange?.(false);
     }
   }

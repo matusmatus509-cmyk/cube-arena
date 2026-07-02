@@ -42,9 +42,9 @@ function ForcePanel({
 
     const handleClear = () => {
       if (!cubeScene) return;
-      cubeScene.setForceSnapshot();
-      (cubeScene as any).forceSnapshot = null;
+      cubeScene.clearForceSnapshot();
       setForceSnapshotExists(false);
+      setForceActive(false);
       setStatus('Force Cube cleared');
     };
 
@@ -106,7 +106,10 @@ export default function App() {
       }
     });
     scene.onForceActiveChange = setForceActive;
-    return () => { scene.destroy(); cubeSceneRef.current = null; };
+    return () => {
+      if (titlePressTimer.current) clearTimeout(titlePressTimer.current);
+      scene.destroy(); cubeSceneRef.current = null;
+    };
   }, []);
 
   const handleScramble = useCallback(() => {
@@ -140,7 +143,7 @@ export default function App() {
   }, [scrambling, solving]);
 
   const handleSolve = useCallback(() => {
-    if (!cubeSceneRef.current || scrambling || solving || solved) return;
+    if (!cubeSceneRef.current || scrambling || solving || solved || cubeSceneRef.current.isForceModeActive()) return;
     const sequence = cubeSceneRef.current.getSolveSequence();
     if (sequence.length === 0) return;
     setSolving(true);
@@ -169,7 +172,6 @@ export default function App() {
     cubeSceneRef.current.reset();
     cubeSceneRef.current.resetRotation();
     setMoveCount(0);
-    setSolved(true);
     setShowSolvedBanner(false);
   }, []);
 

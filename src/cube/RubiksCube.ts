@@ -43,6 +43,7 @@ export class RubiksCube {
   private onMoveCb?: (move: MoveType) => void;
   private cubeState: CubeStateData;
   private activeDrag: DragSession | null = null;
+  private activePivot: THREE.Group | null = null;
   private moveHistory: MoveType[] = [];
 
   constructor(scene: THREE.Scene, cubeGroup: THREE.Group, initialState: CubeStateData) {
@@ -202,20 +203,27 @@ export class RubiksCube {
     return this.activeDrag;
   }
 
+  private lastSmoothTick = 0;
+
   /**
    * Called every animation frame while dragging.
    * Smoothly interpolates `currentAngle` toward `targetAngle`.
-   * Lower lerp factor = slower, more fluid motion.
+   * Frame-rate independent exponential smoothing.
    */
   tickDragSmoothing() {
     if (!this.activeDrag) return;
     const drag = this.activeDrag;
+    const now = performance.now();
+    const dt = this.lastSmoothTick ? Math.min((now - this.lastSmoothTick) / 1000, 0.033) : 0.016;
+    this.lastSmoothTick = now;
+
     const diff = drag.targetAngle - drag.currentAngle;
+    // 12 rad/s smoothing rate — fast enough to feel responsive at any FPS
+    const lambda = 1 - Math.exp(-12 * dt);
     if (Math.abs(diff) < 0.0005) {
       drag.currentAngle = drag.targetAngle;
     } else {
-      // Lerp 0.45 — smooth but responsive, layer stays close to finger
-      drag.currentAngle += diff * 0.45;
+      drag.currentAngle += diff * lambda;
     }
     drag.pivot.quaternion.setFromAxisAngle(drag.axisVec, drag.currentAngle);
   }
@@ -381,6 +389,7 @@ export class RubiksCube {
     onComplete: () => void
   ) {
     const pivot = new THREE.Group();
+    this.activePivot = pivot;
     this.cubeGroup.add(pivot);
 
     for (const cubie of cubies) {
@@ -397,6 +406,16 @@ export class RubiksCube {
     const targetQuat = new THREE.Quaternion().setFromAxisAngle(axisVec, totalAngle);
 
     const tick = (now: number) => {
+      if (this.activePivot !== pivot) {
+        // Animation was aborted — cleanup pivot
+        if (pivot.parent) {
+          for (const cubie of cubies) {
+            if (cubie.mesh.parent === pivot) pivot.remove(cubie.mesh);
+          }
+          this.cubeGroup.remove(pivot);
+        }
+        return;
+      }
       const t = Math.min((now - startTime) / duration, 1);
       const eased = t < 0.5
         ? 2 * t * t
@@ -405,6 +424,7 @@ export class RubiksCube {
       if (t < 1) {
         requestAnimationFrame(tick);
       } else {
+        this.activePivot = null;
         // Reparent
         for (const cubie of cubies) {
           const worldPos = new THREE.Vector3();
@@ -514,29 +534,6 @@ export class RubiksCube {
       case 'R': row = 1 - y; col = 1 - z; break;
     }
     return row * 3 + col;
-  }
-
-  /**
-   * Capture a complete snapshot of all 27 cubies for Force Cube storage.
-   */
-  captureForceSnapshot(): ForceCubieSnapshot[] {
-    const snapshot: ForceCubieSnapshot[] = [];
-    for (const cubie of this.cubies) {
-      const stickerColors: Record<string, string> = {};
-      for (const child of cubie.mesh.children) {
-        if (child.userData.isSticker && (child as THREE.Mesh).material instanceof THREE.MeshPhongMaterial) {
-          const face = child.userData.face;
-          stickerColors[face] = '#' + ((child as THREE.Mesh).material as THREE.MeshPhongMaterial).color.getHexString();
-        }
-      }
-      snapshot.push({
-        logicalPos: { x: cubie.logicalPos.x, y: cubie.logicalPos.y, z: cubie.logicalPos.z },
-        position: { x: cubie.mesh.position.x, y: cubie.mesh.position.y, z: cubie.mesh.position.z },
-        quaternion: { x: cubie.mesh.quaternion.x, y: cubie.mesh.quaternion.y, z: cubie.mesh.quaternion.z, w: cubie.mesh.quaternion.w },
-        stickerColors,
-      });
-    }
-    return snapshot;
   }
 
   /**
@@ -898,6 +895,7 @@ export class RubiksCube {
     this.cubeState = { ...state };
     this.isAnimating = false;
     this.activeDrag = null;
+    this.activePivot = null;
     this.animQueue = [];
     this.moveHistory = [];
     this.buildCube(state);
