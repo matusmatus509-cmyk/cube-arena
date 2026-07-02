@@ -16,16 +16,18 @@ export class CubeScene {
 
   // Force mode
   private forceSnapshot: ForceCubieSnapshot[] | null = null;
-  private forceModeArmed = false;   // checkbox - ready to activate
-  private forceModeActive = false;  // actually applying force (after button)
+  private forceModeActive = false;  // actually applying force
+  private phase1Completed = false;  // tracks if Phase 1 has completed
   private initialVisibleFaces: Set<FaceKey> = new Set();
   private forcedFaces: Set<FaceKey> = new Set();
+  private lastMoveWasL = false;     // tracks L→L' sequence for Phase 2
 
   onForceActiveChange?: (active: boolean) => void;
-  onForceArmedChange?: (armed: boolean) => void;
 
   // Expose forceState for render loop
   get forceState() { return this.forceModeActive; }
+  isPhase1Completed() { return this.phase1Completed; }
+  setPhase1Completed(val: boolean) { this.phase1Completed = val; }
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -77,6 +79,9 @@ export class CubeScene {
 
     // Connect force trigger
     this.interaction.onForceTrigger = () => this.activateForceMode();
+
+    // Connect move listener
+    this.cube.setOnMove((move) => this.handleMoveExecuted(move));
 
     // Resize handler
     window.addEventListener('resize', this.onResize);
@@ -137,12 +142,12 @@ export class CubeScene {
   reset() {
     const solved = createSolvedState();
     this.cube.setState(solved);
-    this.forceModeArmed = false;
     this.forceModeActive = false;
+    this.phase1Completed = false;
+    this.lastMoveWasL = false;
     this.initialVisibleFaces.clear();
     this.forcedFaces.clear();
     this.onForceActiveChange?.(false);
-    this.onForceArmedChange?.(false);
   }
 
   executeMove(move: MoveType) {
@@ -189,36 +194,13 @@ export class CubeScene {
     return this.forceSnapshot;
   }
 
-  /** Enable force mode (arm it) */
-  armForceMode() {
-    this.forceModeArmed = true;
-    this.onForceArmedChange?.(true);
-  }
-
-  /** Disable force mode completely */
-  disarmForceMode() {
-    this.forceModeArmed = false;
-    this.forceModeActive = false;
-    this.onForceActiveChange?.(false);
-    this.onForceArmedChange?.(false);
-  }
-
-  /** Toggle armed state */
-  toggleForceModeArmed() {
-    if (this.forceModeArmed) {
-      this.disarmForceMode();
-    } else {
-      this.armForceMode();
-    }
-  }
-
-  isForceModeArmed(): boolean { return this.forceModeArmed; }
-
   /** Activate force mode */
   activateForceMode() {
-    if (!this.forceModeArmed || this.forceModeActive || !this.forceSnapshot) return;
+    if (this.isForceModeActive() || !this.forceSnapshot) return;
 
     this.forceModeActive = true;
+    this.phase1Completed = true;
+    this.lastMoveWasL = false;
     this.forcedFaces.clear();
 
     // Record which faces are currently visible
@@ -237,16 +219,9 @@ export class CubeScene {
   /** Deactivate force mode */
   deactivateForceMode() {
     this.forceModeActive = false;
+    this.phase1Completed = false;
+    this.lastMoveWasL = false;
     this.onForceActiveChange?.(false);
-  }
-
-  /** Toggle active state */
-  toggleForceMode() {
-    if (this.forceModeActive) {
-      this.deactivateForceMode();
-    } else {
-      this.activateForceMode();
-    }
   }
 
   isForceModeActive(): boolean { return this.forceModeActive; }
@@ -319,6 +294,57 @@ export class CubeScene {
       this.forceModeActive = false;
       this.onForceActiveChange?.(false);
     }
+  }
+
+  private handleMoveExecuted(move: MoveType) {
+    // Expected presentation state check:
+    // 1. Phase 1 has completed.
+    // 2. Force mode is active.
+    // 3. The snapshot exists.
+    // 4. Some but not all faces are forced (Phase 1 ran but Phase 2 hasn't).
+    const isPresentationState =
+      this.phase1Completed &&
+      this.forceModeActive &&
+      this.forceSnapshot !== null &&
+      this.forcedFaces.size > 0 &&
+      this.forcedFaces.size < 6;
+
+    if (move === 'L' && isPresentationState) {
+      // Mark that L was done in presentation state
+      this.lastMoveWasL = true;
+    } else if (move === "L'" && isPresentationState && this.lastMoveWasL) {
+      // L' after L in presentation state → trigger Phase 2
+      this.lastMoveWasL = false;
+      this.executePhase2();
+    } else if (move !== 'L') {
+      // Any other move resets the L tracking
+      this.lastMoveWasL = false;
+    }
+  }
+
+  private executePhase2() {
+    if (!this.forceSnapshot || !this.phase1Completed) return;
+
+    // Remaining faces are initially visible faces that haven't been forced yet
+    const remainingFaces: FaceKey[] = [];
+    for (const face of this.initialVisibleFaces) {
+      if (!this.forcedFaces.has(face)) {
+        remainingFaces.push(face);
+      }
+    }
+
+    if (remainingFaces.length > 0) {
+      // Apply force snapshot one-by-one for each face to prevent resetting quaternions of rotating cubies
+      for (const face of remainingFaces) {
+        this.cube.applyForceSnapshot(this.forceSnapshot, [face]);
+        this.forcedFaces.add(face);
+      }
+    }
+
+    // Force complete - deactivate and reset flags
+    this.forceModeActive = false;
+    this.phase1Completed = false;
+    this.onForceActiveChange?.(false);
   }
 
   destroy() {

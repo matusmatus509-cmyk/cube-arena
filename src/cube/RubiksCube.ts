@@ -40,6 +40,7 @@ export class RubiksCube {
   private isAnimating = false;
   private animQueue: Array<() => void> = [];
   private onStateChangeCb?: (state: CubeStateData) => void;
+  private onMoveCb?: (move: MoveType) => void;
   private cubeState: CubeStateData;
   private activeDrag: DragSession | null = null;
   private moveHistory: MoveType[] = [];
@@ -53,6 +54,10 @@ export class RubiksCube {
 
   setOnStateChange(fn: (state: CubeStateData) => void) {
     this.onStateChangeCb = fn;
+  }
+
+  setOnMove(fn: (move: MoveType) => void) {
+    this.onMoveCb = fn;
   }
 
   getState() { return this.cubeState; }
@@ -355,6 +360,9 @@ export class RubiksCube {
 
     this.cubeGroup.remove(drag.pivot);
     this.onStateChangeCb?.(this.cubeState);
+    if (move) {
+      this.onMoveCb?.(move);
+    }
 
     // Process queue
     if (this.animQueue.length > 0) {
@@ -473,6 +481,7 @@ export class RubiksCube {
       this.animateLayer(cubies, axisVec, angle, ANIM_DURATION, () => {
         this.isAnimating = false;
         this.onStateChangeCb?.(this.cubeState);
+        this.onMoveCb?.(move);
         callback?.();
         if (this.animQueue.length > 0) {
           const next = this.animQueue.shift()!;

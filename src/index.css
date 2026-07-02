@@ -205,21 +205,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   background: rgba(34,197,94,0.1);
 }
 
-.tool-force {
-  color: #ef4444;
-  border-color: rgba(239,68,68,0.2);
-}
-.tool-force:hover:not(:disabled) {
-  color: #fca5a5;
-  background: rgba(239,68,68,0.08);
-  border-color: rgba(239,68,68,0.25);
-}
-.tool-force.active {
-  color: #ef4444;
-  border-color: rgba(239,68,68,0.3);
-  background: rgba(239,68,68,0.1);
-}
-
 @media (max-width: 480px) {
   .toolbar { padding: 6px 8px 10px; gap: 1px; }
   .tool { padding: 8px 6px 4px; max-width: 100px; gap: 2px; }
@@ -363,47 +348,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   display: flex; flex-direction: column; gap: 16px;
 }
 
-.force-checkbox {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 14px;
-  cursor: pointer;
-}
-.force-checkbox input { cursor: pointer; }
-.force-warning { color: var(--orange); font-size: 12px; margin-left: 4px; }
-
-.force-buttons {
-  display: flex; flex-direction: column; gap: 8px;
-}
-
-.force-btn {
-  padding: 10px 16px;
-  background: rgba(59,130,246,0.1);
-  border: 1px solid rgba(59,130,246,0.2);
-  border-radius: 8px;
-  color: #93c5fd;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.force-btn:hover { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); }
-.force-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.force-btn-danger {
-  background: rgba(239,68,68,0.1);
-  border-color: rgba(239,68,68,0.2);
-  color: #fca5a5;
-}
-.force-btn-danger:hover { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3); }
-
-.force-btn-test {
-  background: rgba(34,197,94,0.1);
-  border-color: rgba(34,197,94,0.2);
-  color: #86efac;
-}
-.force-btn-test:hover { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.3); }
-
 .force-status {
   padding: 8px 12px;
   background: rgba(255,255,255,0.04);
@@ -418,3 +362,18 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   line-height: 1.6;
 }
 .force-hint strong { color: var(--text); }
+
+/* SECRET TRIGGER FOR FORCE MODE */
+.secret-trigger-area {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  height: 50px;
+  background: transparent;
+  z-index: 9999;
+  cursor: default;
+  user-select: none;
+  pointer-events: auto;
+}

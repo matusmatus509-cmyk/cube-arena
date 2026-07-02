@@ -13,99 +13,70 @@ const MOVE_GROUPS = [
 
 // Force Panel Component
 function ForcePanel({ 
-  isOpen, 
-  onClose, 
-  cubeScene, 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  cubeScene: CubeScene | null; 
-}) {
-  if (!isOpen) return null;
+    isOpen, 
+    onClose, 
+    cubeScene, 
+  }: { 
+    isOpen: boolean; 
+    onClose: () => void; 
+    cubeScene: CubeScene | null; 
+  }) {
+    if (!isOpen) return null;
 
-  const [forceEnabled, setForceEnabled] = useState(false);
-  const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
-  const [status, setStatus] = useState<string>('');
+    const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
+    const [status, setStatus] = useState<string>('');
 
-  // Sync with cubeScene armed state on mount
-  useEffect(() => {
-    if (cubeScene) {
-      setForceEnabled(cubeScene.isForceModeArmed());
-      setForceSnapshotExists(!!cubeScene.getForceSnapshot());
-    }
-  }, [cubeScene]);
+    // Sync with cubeScene on mount
+    useEffect(() => {
+      if (cubeScene) {
+        setForceSnapshotExists(!!cubeScene.getForceSnapshot());
+      }
+    }, [cubeScene]);
 
-  const handleSetSnapshot = () => {
-    if (!cubeScene) return;
-    cubeScene.setForceSnapshot();
-    setForceSnapshotExists(true);
-    setStatus('Force Cube SNAPSHOT stored (exact copy of current cube)');
-  };
+    const handleSetSnapshot = () => {
+      if (!cubeScene) return;
+      cubeScene.setForceSnapshot();
+      setForceSnapshotExists(true);
+      setStatus('Force Cube SNAPSHOT stored (exact copy of current cube)');
+    };
 
-  const handleClear = () => {
-    if (!cubeScene) return;
-    cubeScene.setForceSnapshot();
-    (cubeScene as any).forceSnapshot = null;
-    setForceSnapshotExists(false);
-    setStatus('Force Cube cleared');
-  };
+    const handleClear = () => {
+      if (!cubeScene) return;
+      cubeScene.setForceSnapshot();
+      (cubeScene as any).forceSnapshot = null;
+      setForceSnapshotExists(false);
+      setStatus('Force Cube cleared');
+    };
 
-  const handleToggleForce = () => {
-    if (!cubeScene) return;
-    cubeScene.toggleForceModeArmed();
-    setForceEnabled(cubeScene.isForceModeArmed());
-    setStatus(cubeScene.isForceModeArmed() ? 'Force mode ARMED' : 'Force mode DISARMED');
-  };
-
-  const handleTestForce = () => {
-    if (!cubeScene || !forceSnapshotExists) return;
-    cubeScene.activateForceMode();
-    setStatus('Force ACTIVATED - rotate cube to see hidden faces transform');
-  };
-
-  return (
-    <div className="force-panel-overlay" onClick={onClose}>
-      <div className="force-panel" onClick={e => e.stopPropagation()}>
-        <div className="force-panel-header">
-          <h2>🔮 Force Mode (Secret)</h2>
-          <button onClick={onClose}>✕</button>
-        </div>
-
-        <div className="force-panel-content">
-          <label className="force-checkbox">
-            <input 
-              type="checkbox" 
-              checked={forceEnabled} 
-              onChange={handleToggleForce} 
-              disabled={!forceSnapshotExists}
-            />
-            <span>Force Mode Enabled</span>
-            {!forceSnapshotExists && <span className="force-warning">(Snapshot cube first)</span>}
-          </label>
-
-          <div className="force-buttons">
-            <button onClick={handleSetSnapshot} className="force-btn">
-              Snapshot Force Cube (Exact Copy)
-            </button>
-            <button onClick={handleClear} className="force-btn force-btn-danger">
-              Clear Force Cube
-            </button>
-            <button onClick={handleTestForce} className="force-btn force-btn-test" disabled={!forceSnapshotExists || forceEnabled}>
-              Test Force (Rotate Cube)
-            </button>
+    return (
+      <div className="force-panel-overlay" onClick={onClose}>
+        <div className="force-panel" onClick={e => e.stopPropagation()}>
+          <div className="force-panel-header">
+            <h2>🔮 Force Mode (Secret)</h2>
+            <button onClick={onClose}>✕</button>
           </div>
 
-          {status && <div className="force-status">{status}</div>}
+          <div className="force-panel-content">
+            <div className="force-buttons">
+              <button onClick={handleSetSnapshot} className="force-btn">
+                Snapshot Force Cube (Exact Copy)
+              </button>
+              <button onClick={handleClear} className="force-btn force-btn-danger">
+                Clear Force Cube
+              </button>
+            </div>
 
-          <div className="force-hint">
-            <p><strong>How it works:</strong> Tap FORCE button in toolbar, then rotate hidden faces away</p>
-            <p>Hidden faces → force state when rotated out of view</p>
+            {status && <div className="force-status">{status}</div>}
+
+            <div className="force-hint">
+              <p><strong>Phase 1:</strong> Double-tap center-top area to activate. Hidden faces → force colors.</p>
+              <p><strong>Phase 2:</strong> Rotate cube to hide originally visible faces, then do L → L' move.</p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -118,7 +89,6 @@ export default function App() {
   const [showSolvedBanner, setShowSolvedBanner] = useState(false);
   const [showForcePanel, setShowForcePanel] = useState(false);
   const [forceActive, setForceActive] = useState(false);
-  const [forceArmed, setForceArmed] = useState(false);
   const scrambleRef = useRef(false);
   const solveRef = useRef(false);
   const titlePressTimer = useRef<number | null>(null);
@@ -136,7 +106,6 @@ export default function App() {
       }
     });
     scene.onForceActiveChange = setForceActive;
-    scene.onForceArmedChange = setForceArmed;
     return () => { scene.destroy(); cubeSceneRef.current = null; };
   }, []);
 
@@ -213,13 +182,17 @@ export default function App() {
 
   const busy = scrambling || solving;
 
-  const handleForceTrigger = useCallback(() => {
-    if (!cubeSceneRef.current) return;
-    if (cubeSceneRef.current.isForceModeActive()) {
-      cubeSceneRef.current.deactivateForceMode();
-    } else {
-      cubeSceneRef.current.activateForceMode();
+  const lastTapRef = useRef<number>(0);
+  const handleSecretTrigger = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const now = performance.now();
+    if (now - lastTapRef.current < 300) {
+      if (cubeSceneRef.current && !cubeSceneRef.current.isForceModeActive() && cubeSceneRef.current.getForceSnapshot()) {
+        cubeSceneRef.current.activateForceMode();
+      }
     }
+    lastTapRef.current = now;
   }, []);
 
   // Title long press handlers
@@ -238,6 +211,12 @@ export default function App() {
 
   return (
     <div className="app-root">
+      {/* Secret trigger area for Phase 1 */}
+      <div 
+        className="secret-trigger-area" 
+        onMouseDown={handleSecretTrigger}
+        onTouchStart={handleSecretTrigger}
+      />
       {/* ── Top bar ── */}
       <header className="topbar">
         <button className="topbar-icon" onClick={() => setShowMoves(!showMoves)}>
@@ -299,18 +278,6 @@ export default function App() {
           </svg>
           <span>Reset</span>
         </button>
-
-        {forceArmed && (
-          <button 
-            className={`tool tool-force ${forceActive ? 'active' : ''}`} 
-            onClick={handleForceTrigger}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-            </svg>
-            <span>{forceActive ? 'ACTIVE' : 'Force'}</span>
-          </button>
-        )}
       </div>
 
       {/* ── Move drawer ── */}
