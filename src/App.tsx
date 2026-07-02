@@ -109,6 +109,9 @@ export default function App() {
       }
     });
     scene.onForceActiveChange = setForceActive;
+    // Single source of truth for the move counter: every executed move
+    // (drag, panel button, scramble step, solve step) increments it.
+    scene.onUserMove = () => setMoveCount(prev => prev + 1);
     return () => {
       if (titlePressTimer.current) clearTimeout(titlePressTimer.current);
       scene.destroy(); cubeSceneRef.current = null;
@@ -137,10 +140,9 @@ export default function App() {
       let move: MoveType;
       do { move = SCRAMBLE_MOVES[Math.floor(Math.random() * SCRAMBLE_MOVES.length)]; } while (move[0] === lastFace);
       lastFace = move[0];
-      cubeSceneRef.current?.executeMove(move);
-      count++;
-      setMoveCount(count);
-      setTimeout(next, 90);
+    cubeSceneRef.current?.executeMove(move);
+    count++;
+    setTimeout(next, 90);
     };
     next();
   }, [scrambling, solving]);
@@ -160,7 +162,6 @@ export default function App() {
       }
       cubeSceneRef.current?.executeSolveMove(sequence[index]);
       index++;
-      setMoveCount(prev => prev + 1);
       setTimeout(next, 220);
     };
     next();
@@ -181,7 +182,6 @@ export default function App() {
   const handleMove = useCallback((move: MoveType) => {
     if (!cubeSceneRef.current) return;
     cubeSceneRef.current.executeMove(move);
-    setMoveCount(prev => prev + 1);
     setSolved(false);
   }, []);
 

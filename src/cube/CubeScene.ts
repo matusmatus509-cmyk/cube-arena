@@ -31,6 +31,8 @@ export class CubeScene {
   };
 
   onForceActiveChange?: (active: boolean) => void;
+  /** Fires for every executed move (drag, button, scramble, solve). */
+  onUserMove?: (move: MoveType) => void;
 
   isPhase1Completed() { return this.phase1Completed; }
   setPhase1Completed(val: boolean) { this.phase1Completed = val; }
@@ -317,6 +319,9 @@ export class CubeScene {
   }
 
   private handleMoveExecuted(move: MoveType) {
+    // Notify listeners of every executed move (used for the move counter).
+    this.onUserMove?.(move);
+
     // Expected presentation state check:
     // 1. Phase 1 has completed.
     // 2. Force mode is active.
