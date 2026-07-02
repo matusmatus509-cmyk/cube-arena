@@ -45,6 +45,10 @@ export class RubiksCube {
   private activeDrag: DragSession | null = null;
   private activePivot: THREE.Group | null = null;
   private moveHistory: MoveType[] = [];
+  // True while a released layer is animating to its snapped position. During
+  // this window the cubies are still parented to a pivot, so no new drag may
+  // begin until finalizeDrag reparents them.
+  private isSettling = false;
 
   constructor(scene: THREE.Scene, cubeGroup: THREE.Group, initialState: CubeStateData) {
     this.scene = scene;
@@ -64,6 +68,8 @@ export class RubiksCube {
   getState() { return this.cubeState; }
   isCurrentlyAnimating() { return this.isAnimating; }
   isDragging() { return this.activeDrag !== null; }
+  /** True if any drag, snap-settle, or programmatic animation is in progress. */
+  isBusy() { return this.isAnimating || this.activeDrag !== null || this.isSettling; }
 
   private buildCube(state: CubeStateData) {
     this.cubies.forEach(c => this.cubeGroup.remove(c.mesh));
@@ -200,6 +206,9 @@ export class RubiksCube {
       currentAngle: 0,
     };
 
+    // Fresh smoothing clock so the first frame doesn't jump from a stale delta.
+    this.lastSmoothTick = 0;
+
     return this.activeDrag;
   }
 
@@ -218,8 +227,9 @@ export class RubiksCube {
     this.lastSmoothTick = now;
 
     const diff = drag.targetAngle - drag.currentAngle;
-    // 12 rad/s smoothing rate — fast enough to feel responsive at any FPS
-    const lambda = 1 - Math.exp(-12 * dt);
+    // High smoothing rate — the layer tracks the finger almost 1:1 (near
+    // instant) while still filtering out per-frame pointer jitter.
+    const lambda = 1 - Math.exp(-35 * dt);
     if (Math.abs(diff) < 0.0005) {
       drag.currentAngle = drag.targetAngle;
     } else {
@@ -241,21 +251,34 @@ export class RubiksCube {
    * visually is right now) — so the motion is always seamless.
    * Commit threshold: 45°.
    */
-  endDrag() {
+  endDrag(velocity = 0) {
     if (!this.activeDrag) return;
     const drag = this.activeDrag;
     this.activeDrag = null;
 
     const halfPi = Math.PI / 2;
     const commitThreshold = Math.PI / 4; // 45°
+    // A quick flick commits a turn even if the finger didn't travel far.
+    // velocity is in rad/ms; ~0.004 rad/ms ≈ a 90° turn in ~390ms.
+    const FLICK_VELOCITY = 0.004;
+    const FLICK_MIN_ANGLE = Math.PI / 18; // 10° — ignore accidental micro-flicks
 
     // Use targetAngle for the decision — it reflects the finger's intent
     // even if the visual (currentAngle) hasn't caught up yet due to lerp.
     const decisionAngle = drag.targetAngle;
 
-    if (Math.abs(decisionAngle) >= commitThreshold) {
-      // Commit the turn
-      const direction = decisionAngle > 0 ? 1 : -1;
+    let commit = Math.abs(decisionAngle) >= commitThreshold;
+    // Direction from the dragged distance by default.
+    let direction = decisionAngle >= 0 ? 1 : -1;
+
+    // Flick override: a fast release past a small minimum commits one turn
+    // in the direction of the flick, so a single quick swipe = one turn.
+    if (!commit && Math.abs(velocity) >= FLICK_VELOCITY && Math.abs(decisionAngle) >= FLICK_MIN_ANGLE) {
+      commit = true;
+      direction = velocity > 0 ? 1 : -1;
+    }
+
+    if (commit) {
       const targetAngle = direction * halfPi;
       const move = this.getMoveFromDrag(drag.axis, drag.layer, direction);
       this.snapDragTo(drag, targetAngle, move);
@@ -294,6 +317,9 @@ export class RubiksCube {
   }
 
   private snapDragTo(drag: DragSession, targetAngle: number, move: MoveType | null) {
+    // Lock out new interactions until the layer finishes settling.
+    this.isSettling = true;
+
     const startAngle = drag.currentAngle;
     const startQuat = new THREE.Quaternion().setFromAxisAngle(drag.axisVec, startAngle);
     const targetQuat = new THREE.Quaternion().setFromAxisAngle(drag.axisVec, targetAngle);
@@ -367,6 +393,10 @@ export class RubiksCube {
     }
 
     this.cubeGroup.remove(drag.pivot);
+
+    // Layer is fully reparented and snapped — safe to accept new input again.
+    this.isSettling = false;
+
     this.onStateChangeCb?.(this.cubeState);
     if (move) {
       this.onMoveCb?.(move);

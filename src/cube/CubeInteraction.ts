@@ -24,6 +24,10 @@ interface DragState {
   screenDir: { x: number; y: number };
   angle: number;
   chosenCandidate: CandidateDrag;
+  // For flick detection: last angle + timestamp and smoothed angular velocity (rad/ms)
+  lastAngle: number;
+  lastTime: number;
+  velocity: number;
 }
 
 interface PointerState {
@@ -226,7 +230,9 @@ export class CubeInteraction {
   /* ── Event binding ── */
 
   private onPointerDown = (e: MouseEvent | TouchEvent) => {
-    if (this.cube.isCurrentlyAnimating() || this.cube.isDragging()) return;
+    // Block new input while a drag, snap-settle, or programmatic animation
+    // is still in progress — prevents a second turn from starting mid-snap.
+    if (this.cube.isBusy()) return;
     e.preventDefault();
 
     const p = this.pos(e);
@@ -348,6 +354,9 @@ export class CubeInteraction {
             screenDir: winner.screenDir,
             angle: 0,
             chosenCandidate: winner,
+            lastAngle: 0,
+            lastTime: performance.now(),
+            velocity: 0,
           };
         }
 
@@ -372,6 +381,16 @@ export class CubeInteraction {
       const rawAngle = dist * sens;
       const clampedAngle = Math.max(-halfPi, Math.min(halfPi, rawAngle));
       this.cube.setDragAngle(clampedAngle);
+
+      // Track angular velocity (rad/ms) with light smoothing for flick detection.
+      const nowT = performance.now();
+      const dtA = nowT - this.ptr.drag.lastTime;
+      if (dtA > 0) {
+        const instV = (clampedAngle - this.ptr.drag.lastAngle) / dtA;
+        this.ptr.drag.velocity = this.ptr.drag.velocity * 0.6 + instV * 0.4;
+        this.ptr.drag.lastAngle = clampedAngle;
+        this.ptr.drag.lastTime = nowT;
+      }
     }
 
     this.ptr.lastX = p.x;
@@ -388,7 +407,13 @@ export class CubeInteraction {
     }
 
     if (this.cube.isDragging()) {
-      this.cube.endDrag();
+      // If the finger paused before lifting, the flick is stale — ignore it.
+      let releaseVelocity = 0;
+      if (this.ptr.drag) {
+        const idle = performance.now() - this.ptr.drag.lastTime;
+        releaseVelocity = idle < 90 ? this.ptr.drag.velocity : 0;
+      }
+      this.cube.endDrag(releaseVelocity);
     }
 
     this.ptr = this.fresh();
