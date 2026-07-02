@@ -199,10 +199,11 @@ export class CubeInteraction {
     const edgePx = (edge.x * 0.5 + 0.5) * rect.width;
 
     const cubeScreenRadius = Math.abs(edgePx - centerPx);
-    // Swipe across ~1.2× the cube diameter = 90°
-    // One natural swipe across a face = one full turn, with a tiny margin
-    const swipeForFullTurn = cubeScreenRadius * 2 * 1.2;
-    if (swipeForFullTurn < 10) return 0.009; // fallback
+    // The layer follows the finger, but at a slower ratio: a full 90° turn now
+    // requires a longer swipe (~2.6× the cube diameter). This makes the layer
+    // rotate noticeably slower than the finger while still moving with it.
+    const swipeForFullTurn = cubeScreenRadius * 2 * 2.6;
+    if (swipeForFullTurn < 10) return 0.004; // fallback
     return (Math.PI / 2) / swipeForFullTurn;
   }
 

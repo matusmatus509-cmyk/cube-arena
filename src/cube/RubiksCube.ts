@@ -6,7 +6,7 @@ export const GAP = 0.05;
 export const TOTAL = CUBIE_SIZE + GAP;
 const STICKER_SCALE = 0.86;
 const STICKER_DEPTH = 0.005;
-const SNAP_ANIM_DURATION = 280; // ms for snap animation after release
+const SNAP_ANIM_DURATION = 420; // ms for snap animation after release
 
 /** Complete snapshot of a single cubie for Force Cube storage */
 export interface ForceCubieSnapshot {
@@ -324,16 +324,14 @@ export class RubiksCube {
     }
 
     const startTime = performance.now();
-    // Duration proportional to remaining angle, minimum 80ms for feel
-    const duration = Math.max(80, SNAP_ANIM_DURATION * (diff / (Math.PI / 2)));
+    // Duration proportional to remaining angle, minimum 140ms for a smooth feel
+    const duration = Math.max(140, SNAP_ANIM_DURATION * (diff / (Math.PI / 2)));
 
     const tick = (now: number) => {
       const t = Math.min((now - startTime) / duration, 1);
-      // easeInOut — starts smooth (continuing the swipe momentum)
-      // and decelerates into the final position
-      const eased = t < 0.5
-        ? 2 * t * t
-        : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      // easeOutCubic — carries the swipe momentum forward and gently
+      // decelerates into the final snapped position for a smooth completion.
+      const eased = 1 - Math.pow(1 - t, 3);
       drag.pivot.quaternion.slerpQuaternions(startQuat, targetQuat, eased);
       if (t < 1) {
         requestAnimationFrame(tick);
