@@ -206,13 +206,9 @@ export class RubiksCube {
       currentAngle: 0,
     };
 
-    // Fresh smoothing clock so the first frame doesn't jump from a stale delta.
-    this.lastSmoothTick = 0;
-
     return this.activeDrag;
   }
 
-  private lastSmoothTick = 0;
 
   /**
    * Called every animation frame while dragging.
@@ -220,28 +216,24 @@ export class RubiksCube {
    * Frame-rate independent exponential smoothing.
    */
   tickDragSmoothing() {
-    if (!this.activeDrag) return;
-    const drag = this.activeDrag;
-    const now = performance.now();
-    const dt = this.lastSmoothTick ? Math.min((now - this.lastSmoothTick) / 1000, 0.033) : 0.016;
-    this.lastSmoothTick = now;
-
-    const diff = drag.targetAngle - drag.currentAngle;
-    // High smoothing rate — the layer tracks the finger almost 1:1 (near
-    // instant) while still filtering out per-frame pointer jitter.
-    const lambda = 1 - Math.exp(-35 * dt);
-    if (Math.abs(diff) < 0.0005) {
-      drag.currentAngle = drag.targetAngle;
-    } else {
-      drag.currentAngle += diff * lambda;
-    }
-    drag.pivot.quaternion.setFromAxisAngle(drag.axisVec, drag.currentAngle);
+    // Finger tracking is now applied directly in setDragAngle (event-driven,
+    // decoupled from the render loop) so the drag feel is identical whether or
+    // not force mode is running per-frame work. Nothing to do here while a
+    // drag is active; kept for API compatibility.
+    return;
   }
 
-  /** Update the target angle from pointer */
+  /**
+   * Update the layer angle directly from the pointer — the layer follows the
+   * finger exactly 1:1 with no smoothing lag. Applied on every pointermove so
+   * the motion is instant and its speed never depends on the render-loop frame
+   * rate (and therefore never changes when force mode is active or has run).
+   */
   setDragAngle(angle: number) {
     if (!this.activeDrag) return;
     this.activeDrag.targetAngle = angle;
+    this.activeDrag.currentAngle = angle;
+    this.activeDrag.pivot.quaternion.setFromAxisAngle(this.activeDrag.axisVec, angle);
   }
 
   /**
