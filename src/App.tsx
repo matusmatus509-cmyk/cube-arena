@@ -21,17 +21,17 @@ function ForcePanel({
     onClose: () => void; 
     cubeScene: CubeScene | null; 
   }) {
-    if (!isOpen) return null;
-
     const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
     const [status, setStatus] = useState<string>('');
 
-    // Sync with cubeScene on mount
+    // Sync with cubeScene whenever the panel opens
     useEffect(() => {
-      if (cubeScene) {
+      if (isOpen && cubeScene) {
         setForceSnapshotExists(!!cubeScene.getForceSnapshot());
       }
-    }, [cubeScene]);
+    }, [cubeScene, isOpen]);
+
+    if (!isOpen) return null;
 
     const handleSetSnapshot = () => {
       if (!cubeScene) return;
@@ -44,7 +44,6 @@ function ForcePanel({
       if (!cubeScene) return;
       cubeScene.clearForceSnapshot();
       setForceSnapshotExists(false);
-      setForceActive(false);
       setStatus('Force Cube cleared');
     };
 
@@ -57,6 +56,10 @@ function ForcePanel({
           </div>
 
           <div className="force-panel-content">
+            <div className="force-status">
+              Force Cube: {forceSnapshotExists ? 'STORED ✓' : 'none'}
+            </div>
+
             <div className="force-buttons">
               <button onClick={handleSetSnapshot} className="force-btn">
                 Snapshot Force Cube (Exact Copy)
