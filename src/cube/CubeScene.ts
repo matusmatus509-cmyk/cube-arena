@@ -310,15 +310,21 @@ export class CubeScene {
       this.forcedFaces.size < 6;
 
     if (move === 'L' && isPresentationState) {
-      // Mark that L was done in presentation state
+      // Pause auto-detection so it doesn't consume remaining faces before Phase 2
+      this.forceModeActive = false;
       this.lastMoveWasL = true;
-    } else if (move === "L'" && isPresentationState && this.lastMoveWasL) {
-      // L' after L in presentation state → trigger Phase 2
+    } else if (move === "L'" && this.lastMoveWasL && this.phase1Completed && this.forceSnapshot && this.forcedFaces.size > 0 && this.forcedFaces.size < 6) {
+      // L' after L → trigger Phase 2 on ALL remaining faces at once
       this.lastMoveWasL = false;
       this.executePhase2();
-    } else if (move !== 'L') {
-      // Any other move resets the L tracking
+    } else if (move === 'L') {
+      this.lastMoveWasL = true;
+    } else {
+      // Any other move resets the L tracking and resumes auto-detection if applicable
       this.lastMoveWasL = false;
+      if (this.phase1Completed && !this.forceModeActive && this.forceSnapshot && this.forcedFaces.size > 0 && this.forcedFaces.size < 6) {
+        this.forceModeActive = true;
+      }
     }
   }
 
