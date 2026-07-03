@@ -46,7 +46,7 @@ export class CubeScene {
 
     // Camera — aspect will be corrected on first resize
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-    this.camera.position.set(0, 0, 9.0);
+    this.camera.position.set(0, 0, 13.0);
 
     // Renderer — let CSS control the canvas size (width/height 100% in CSS).
     // We pass 1×1 initially and call onResize() immediately after mount so the
