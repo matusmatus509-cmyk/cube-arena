@@ -208,10 +208,9 @@ export class CubeInteraction {
     // Full 2D screen distance so the measure never collapses due to projection.
     const cubeScreenRadius = Math.hypot(ePx.x - cPx.x, ePx.y - cPx.y);
 
-    // The layer follows the finger, but at a slower ratio: a full 90° turn
-    // requires a longer swipe (~2.6× the cube diameter). This makes the layer
-    // rotate noticeably slower than the finger while still moving with it.
-    const swipeForFullTurn = cubeScreenRadius * 2 * 2.6;
+    // The layer follows the finger at a 1:1-ish ratio: a full 90° turn
+    // requires a swipe of roughly 1.4× the cube diameter — fast and direct.
+    const swipeForFullTurn = cubeScreenRadius * 2 * 1.4;
     if (swipeForFullTurn < 10) return 0.004; // fallback
     return (Math.PI / 2) / swipeForFullTurn;
   }
@@ -431,6 +430,9 @@ export class CubeInteraction {
 
   private bindEvents() {
     const el = this.renderer.domElement;
+    // Prevent the browser from stealing touch events for scroll/zoom
+    el.style.touchAction = 'none';
+    el.style.userSelect = 'none';
     el.addEventListener('mousedown', this.onPointerDown, { passive: false });
     el.addEventListener('mousemove', this.onPointerMove, { passive: false });
     window.addEventListener('mouseup', this.onPointerUp);

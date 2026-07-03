@@ -40,23 +40,22 @@ export class CubeScene {
   constructor(container: HTMLElement) {
     this.container = container;
 
-    const w = container.clientWidth || window.innerWidth;
-    const h = container.clientHeight || window.innerHeight;
-
     // Scene
     this.scene = new THREE.Scene();
     this.scene.background = null;
 
-    // Camera
-    this.camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
-    this.camera.position.set(0, 0, 7.5);
+    // Camera — aspect will be corrected on first resize
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    this.camera.position.set(0, 0.3, 9.0);
 
-    // Renderer
+    // Renderer — let CSS control the canvas size (width/height 100% in CSS).
+    // We pass 1×1 initially and call onResize() immediately after mount so the
+    // camera aspect + renderer drawingBuffer match the CSS-computed size.
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
     });
-    this.renderer.setSize(w, h);
+    this.renderer.setSize(1, 1, false);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -95,6 +94,10 @@ export class CubeScene {
     window.addEventListener('resize', this.onResize);
     this.ro = new ResizeObserver(() => this.onResize());
     this.ro.observe(this.container);
+
+    // Sync camera + renderer to the CSS-computed canvas size right away
+    // (deferred one frame so the browser has finished layout)
+    requestAnimationFrame(() => this.onResize());
 
     // Start render loop
     this.startRenderLoop();
@@ -135,12 +138,20 @@ export class CubeScene {
   }
 
   private onResize = () => {
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
+    // Read CSS-computed size of the canvas element (set by .canvas-wrap CSS)
+    const el = this.renderer.domElement;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
     if (w === 0 || h === 0) return;
+    // Update the WebGL drawing buffer to match the CSS size (scaled by DPR)
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    const bw = Math.round(w * dpr);
+    const bh = Math.round(h * dpr);
+    if (this.renderer.domElement.width !== bw || this.renderer.domElement.height !== bh) {
+      this.renderer.setSize(w, h, false);
+    }
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
   };
 
   setOnStateChange(fn: (state: CubeStateData) => void) {

@@ -1,15 +1,46 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { CubeScene } from './cube/CubeScene';
-import { isSolved, MoveType } from './cube/CubeState';
+import { isSolved, MoveType, CubeStateData } from './cube/CubeState';
+
+const PRESET_STORAGE_KEY = 'cubemix_presets';
+const MAX_PRESETS = 5;
+const BG_STORAGE_KEY = 'cubemix_bg';
+
+interface Preset {
+  id: string;
+  name: string;
+  state: CubeStateData;
+  savedAt: number;
+}
+
+function loadPresets(): Preset[] {
+  try {
+    const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function savePresets(presets: Preset[]) {
+  localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(presets));
+}
 
 const SCRAMBLE_MOVES: MoveType[] = ['U', "U'", 'D', "D'", 'F', "F'", 'B', "B'", 'L', "L'", 'R', "R'"];
 
-const MOVE_GROUPS = [
-  { label: 'Up / Down', moves: ['U', "U'", 'D', "D'"] as MoveType[] },
-  { label: 'Front / Back', moves: ['F', "F'", 'B', "B'"] as MoveType[] },
-  { label: 'Left / Right', moves: ['L', "L'", 'R', "R'"] as MoveType[] },
-  { label: 'Middle Slices', moves: ['M', "M'", 'E', "E'", 'S', "S'"] as MoveType[] },
-];
+function applyBackground(url: string) {
+  const root = document.querySelector<HTMLElement>('.app-root');
+  if (!root) return;
+  if (url) {
+    root.style.backgroundImage = `url(${url})`;
+    root.style.backgroundSize = 'cover';
+    root.style.backgroundPosition = 'center';
+    root.style.backgroundRepeat = 'no-repeat';
+  } else {
+    root.style.backgroundImage = '';
+    root.style.backgroundSize = '';
+    root.style.backgroundPosition = '';
+    root.style.backgroundRepeat = '';
+  }
+}
 
 // Force Panel Component
 function ForcePanel({ 
@@ -23,13 +54,43 @@ function ForcePanel({
   }) {
     const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
     const [status, setStatus] = useState<string>('');
+    const [presets, setPresets] = useState<Preset[]>([]);
+    const [namingSlot, setNamingSlot] = useState<string | null>(null);
+    const [nameInput, setNameInput] = useState('');
+    const [bgUrl, setBgUrl] = useState<string>(() => localStorage.getItem(BG_STORAGE_KEY) ?? '');
+    const bgInputRef = useRef<HTMLInputElement>(null);
 
-    // Sync with cubeScene whenever the panel opens
     useEffect(() => {
-      if (isOpen && cubeScene) {
-        setForceSnapshotExists(!!cubeScene.getForceSnapshot());
+      if (isOpen) {
+        if (cubeScene) setForceSnapshotExists(!!cubeScene.getForceSnapshot());
+        setPresets(loadPresets());
+        setStatus('');
+        setNamingSlot(null);
+        setNameInput('');
+        setBgUrl(localStorage.getItem(BG_STORAGE_KEY) ?? '');
       }
     }, [cubeScene, isOpen]);
+
+    const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        localStorage.setItem(BG_STORAGE_KEY, dataUrl);
+        setBgUrl(dataUrl);
+        applyBackground(dataUrl);
+        setStatus('Pozadie nastavené');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    const handleRemoveBg = () => {
+      localStorage.removeItem(BG_STORAGE_KEY);
+      setBgUrl('');
+      applyBackground('');
+      setStatus('Pozadie odstránené');
+    };
 
     if (!isOpen) return null;
 
@@ -37,56 +98,235 @@ function ForcePanel({
       if (!cubeScene) return;
       cubeScene.setForceSnapshot();
       setForceSnapshotExists(true);
-      setStatus('Force Cube SNAPSHOT stored (exact copy of current cube)');
+      setStatus('Force Cube snapshot uložený');
     };
 
     const handleClear = () => {
       if (!cubeScene) return;
       cubeScene.clearForceSnapshot();
       setForceSnapshotExists(false);
-      setStatus('Force Cube cleared');
+      setStatus('Force Cube vymazaný');
+    };
+
+    const handleSavePreset = () => {
+      if (!cubeScene || !namingSlot) return;
+      const name = nameInput.trim() || `Preset ${presets.length + 1}`;
+      const state = cubeScene.getState();
+      const updated = [
+        ...presets.filter(p => p.id !== namingSlot),
+        { id: namingSlot, name, state, savedAt: Date.now() },
+      ].slice(-MAX_PRESETS);
+      savePresets(updated);
+      setPresets(updated);
+      setNamingSlot(null);
+      setNameInput('');
+      setStatus(`Preset "${name}" uložený`);
+    };
+
+    const handleLoadPreset = (preset: Preset) => {
+      if (!cubeScene) return;
+      cubeScene.setState(preset.state);
+      setStatus(`Načítaný: "${preset.name}"`);
+    };
+
+    const handleDeletePreset = (id: string) => {
+      const updated = presets.filter(p => p.id !== id);
+      savePresets(updated);
+      setPresets(updated);
     };
 
     return (
       <div className="force-panel-overlay" onClick={onClose}>
         <div className="force-panel" onClick={e => e.stopPropagation()}>
           <div className="force-panel-header">
-            <h2>🔮 Force Mode (Secret)</h2>
+            <h2>Tajné nastavenia</h2>
             <button onClick={onClose}>✕</button>
           </div>
 
           <div className="force-panel-content">
-            <div className="force-status">
-              Force Cube: {forceSnapshotExists ? 'STORED ✓' : 'none'}
-            </div>
 
+            {/* ── Force snapshot section ── */}
+            <div className="force-section-title">Force Mode</div>
+            <div className="force-status">
+              Force Cube: {forceSnapshotExists ? 'ULOŽENÝ ✓' : 'žiadny'}
+            </div>
             <div className="force-buttons">
               <button onClick={handleSetSnapshot} className="force-btn">
-                Snapshot Force Cube (Exact Copy)
+                Snapshot Force Cube (presná kópia)
               </button>
               <button onClick={handleClear} className="force-btn force-btn-danger">
-                Clear Force Cube
+                Vymazať Force Cube
               </button>
             </div>
+            <div className="force-hint">
+              <p><strong>Fáza 1:</strong> Dvojité ťuknutie na stred-vrch aktivuje Force Mode. Skryté plochy si udržiavajú farby.</p>
+              <p><strong>Fáza 2:</strong> Otočte kocku aby boli pôvodne viditeľné plochy skryté, potom urobte L a potom L&apos;.</p>
+            </div>
+
+            {/* ── Divider ── */}
+            <div className="force-divider" />
+
+            {/* ── Background section ── */}
+            <div className="force-section-title">Pozadie</div>
+
+            {bgUrl ? (
+              <div className="bg-preview-wrap">
+                <img className="bg-preview-img" src={bgUrl} alt="Aktuálne pozadie" />
+                <div className="bg-preview-actions">
+                  <button className="force-btn" onClick={() => bgInputRef.current?.click()}>
+                    Zmeniť fotku
+                  </button>
+                  <button className="force-btn force-btn-danger" onClick={handleRemoveBg}>
+                    Odstrániť
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button className="force-btn bg-upload-btn" onClick={() => bgInputRef.current?.click()}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                Nahrať fotku zo zariadenia
+              </button>
+            )}
+
+            <input
+              ref={bgInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleBgUpload}
+            />
+
+            {/* ── Divider ── */}
+            <div className="force-divider" />
+
+            {/* ── Preset snapshots section ── */}
+            <div className="force-section-title">Presety kocky</div>
+
+            {presets.length === 0 && (
+              <div className="force-status">Žiadne presety uložené</div>
+            )}
+
+            {presets.map(preset => (
+              <div key={preset.id} className="preset-row">
+                <span className="preset-name">{preset.name}</span>
+                <div className="preset-actions">
+                  <button className="force-btn preset-btn" onClick={() => handleLoadPreset(preset)}>
+                    Načítať
+                  </button>
+                  <button className="force-btn force-btn-danger preset-btn" onClick={() => handleDeletePreset(preset.id)}>
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {presets.length < MAX_PRESETS && (
+              namingSlot ? (
+                <div className="preset-name-row">
+                  <input
+                    className="preset-input"
+                    placeholder="Názov presetu..."
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSavePreset(); }}
+                    autoFocus
+                  />
+                  <button className="force-btn" onClick={handleSavePreset}>Uložiť</button>
+                  <button className="force-btn force-btn-danger" onClick={() => setNamingSlot(null)}>✕</button>
+                </div>
+              ) : (
+                <button
+                  className="force-btn"
+                  onClick={() => { setNamingSlot(`preset_${Date.now()}`); setNameInput(''); }}
+                >
+                  + Uložiť aktuálny stav kocky
+                </button>
+              )
+            )}
 
             {status && <div className="force-status">{status}</div>}
-
-            <div className="force-hint">
-              <p><strong>Phase 1:</strong> Double-tap center-top area to activate. Hidden faces → force colors.</p>
-              <p><strong>Phase 2:</strong> Rotate cube to hide originally visible faces, then do L → L' move.</p>
-            </div>
           </div>
         </div>
       </div>
     );
   }
 
+// Side Panel Component
+function SidePanel({
+  isOpen,
+  onClose,
+  onScramble,
+  onSolve,
+  scrambling,
+  solving,
+  solved,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onScramble: () => void;
+  onSolve: () => void;
+  scrambling: boolean;
+  solving: boolean;
+  solved: boolean;
+}) {
+  const busy = scrambling || solving;
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div className="overlay" onClick={onClose} />
+      <div className="drawer">
+        <div className="drawer-head">
+          <h2>MENU</h2>
+          <button className="drawer-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="drawer-actions">
+          <button
+            className="drawer-action-btn"
+            onClick={() => { onScramble(); onClose(); }}
+            disabled={busy}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" />
+              <polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" />
+              <line x1="4" y1="4" x2="9" y2="9" />
+            </svg>
+            <span>{scrambling ? 'Scrambling...' : 'Scramble'}</span>
+          </button>
+
+          <button
+            className={`drawer-action-btn drawer-action-solve ${solving ? 'active' : ''}`}
+            onClick={() => { onSolve(); onClose(); }}
+            disabled={busy || solved}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <span>{solving ? 'Solving...' : 'Solve'}</span>
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
   const cubeSceneRef = useRef<CubeScene | null>(null);
   const [solved, setSolved] = useState(true);
-  const [moveCount, setMoveCount] = useState(0);
-  const [showMoves, setShowMoves] = useState(false);
+
+  // Apply saved background image immediately on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(BG_STORAGE_KEY);
+    if (saved) applyBackground(saved);
+  }, []);
+  const [showPanel, setShowPanel] = useState(false);
   const [scrambling, setScrambling] = useState(false);
   const [solving, setSolving] = useState(false);
   const [showSolvedBanner, setShowSolvedBanner] = useState(false);
@@ -109,9 +349,6 @@ export default function App() {
       }
     });
     scene.onForceActiveChange = setForceActive;
-    // Single source of truth for the move counter: every executed move
-    // (drag, panel button, scramble step, solve step) increments it.
-    scene.onUserMove = () => setMoveCount(prev => prev + 1);
     return () => {
       if (titlePressTimer.current) clearTimeout(titlePressTimer.current);
       scene.destroy(); cubeSceneRef.current = null;
@@ -124,7 +361,6 @@ export default function App() {
     setSolving(false);
     setScrambling(true);
     scrambleRef.current = true;
-    setMoveCount(0);
     setSolved(false);
     setShowSolvedBanner(false);
     cubeSceneRef.current.clearHistory();
@@ -140,9 +376,9 @@ export default function App() {
       let move: MoveType;
       do { move = SCRAMBLE_MOVES[Math.floor(Math.random() * SCRAMBLE_MOVES.length)]; } while (move[0] === lastFace);
       lastFace = move[0];
-    cubeSceneRef.current?.executeMove(move);
-    count++;
-    setTimeout(next, 90);
+      cubeSceneRef.current?.executeMove(move);
+      count++;
+      setTimeout(next, 90);
     };
     next();
   }, [scrambling, solving]);
@@ -175,14 +411,7 @@ export default function App() {
     setSolving(false);
     cubeSceneRef.current.reset();
     cubeSceneRef.current.resetRotation();
-    setMoveCount(0);
     setShowSolvedBanner(false);
-  }, []);
-
-  const handleMove = useCallback((move: MoveType) => {
-    if (!cubeSceneRef.current) return;
-    cubeSceneRef.current.executeMove(move);
-    setSolved(false);
   }, []);
 
   const busy = scrambling || solving;
@@ -200,7 +429,6 @@ export default function App() {
     lastTapRef.current = now;
   }, []);
 
-  // Title long press handlers
   const onTitleMouseDown = () => {
     titlePressTimer.current = window.setTimeout(() => {
       setShowForcePanel(true);
@@ -216,15 +444,16 @@ export default function App() {
 
   return (
     <div className="app-root">
-      {/* Secret trigger area for Phase 1 */}
+      {/* Secret trigger area */}
       <div 
         className="secret-trigger-area" 
         onMouseDown={handleSecretTrigger}
         onTouchStart={handleSecretTrigger}
       />
-      {/* ── Top bar ── */}
+
+      {/* Top bar */}
       <header className="topbar">
-        <button className="topbar-icon" onClick={() => setShowMoves(!showMoves)}>
+        <button className="topbar-icon" onClick={() => setShowPanel(!showPanel)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
           </svg>
@@ -239,44 +468,21 @@ export default function App() {
         >
           CUBEMIX
         </span>
-        <div className="topbar-stats">
-          <div className="stat">
-            <span className="stat-num">{moveCount}</span>
-            <span className="stat-lbl">moves</span>
-          </div>
-          <div className={`status-dot ${solved ? 'dot-solved' : 'dot-unsolved'}`} />
-        </div>
+        <div className="topbar-stats" />
       </header>
 
-      {/* ── Solved toast ── */}
+      {/* Solved toast */}
       {showSolvedBanner && (
-        <div className="solved-toast">✅ SOLVED!</div>
+        <div className="solved-toast">SOLVED!</div>
       )}
 
-      {/* ── Cube area ── */}
+      {/* Cube area */}
       <div className="cube-area">
         <div className="canvas-wrap" ref={mountRef} />
       </div>
 
-      {/* ── Bottom toolbar ── */}
+      {/* Bottom toolbar — Reset only */}
       <div className="toolbar">
-        <button className="tool" onClick={handleScramble} disabled={busy}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" />
-            <polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" />
-            <line x1="4" y1="4" x2="9" y2="9" />
-          </svg>
-          <span>{scrambling ? '...' : 'Scramble'}</span>
-        </button>
-
-        <button className={`tool tool-primary ${solving ? 'active' : ''}`} onClick={handleSolve} disabled={busy || solved}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-          <span>{solving ? '...' : 'Solve'}</span>
-        </button>
-
         <button className="tool" onClick={handleReset} disabled={busy}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
@@ -285,32 +491,18 @@ export default function App() {
         </button>
       </div>
 
-      {/* ── Move drawer ── */}
-      {showMoves && (
-        <>
-          <div className="overlay" onClick={() => setShowMoves(false)} />
-          <div className="drawer">
-            <div className="drawer-head">
-              <h2>MOVES</h2>
-              <button className="drawer-close" onClick={() => setShowMoves(false)}>✕</button>
-            </div>
-            {MOVE_GROUPS.map(group => (
-              <div key={group.label} className="move-section">
-                <div className="move-section-title">{group.label}</div>
-                <div className="move-grid">
-                  {group.moves.map(move => (
-                    <button key={move} className="move-chip" onClick={() => handleMove(move)} disabled={busy}>
-                      {move}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+      {/* Side panel with Scramble + Solve */}
+      <SidePanel
+        isOpen={showPanel}
+        onClose={() => setShowPanel(false)}
+        onScramble={handleScramble}
+        onSolve={handleSolve}
+        scrambling={scrambling}
+        solving={solving}
+        solved={solved}
+      />
 
-      {/* ── Force Panel ── */}
+      {/* Force Panel */}
       <ForcePanel 
         isOpen={showForcePanel}
         onClose={() => setShowForcePanel(false)}

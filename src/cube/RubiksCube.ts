@@ -6,7 +6,7 @@ export const GAP = 0.05;
 export const TOTAL = CUBIE_SIZE + GAP;
 const STICKER_SCALE = 0.86;
 const STICKER_DEPTH = 0.005;
-const SNAP_ANIM_DURATION = 420; // ms for snap animation after release
+const SNAP_ANIM_DURATION = 220; // ms for snap animation after release
 
 /** Complete snapshot of a single cubie for Force Cube storage */
 export interface ForceCubieSnapshot {
@@ -325,7 +325,7 @@ export class RubiksCube {
 
     const startTime = performance.now();
     // Duration proportional to remaining angle, minimum 140ms for a smooth feel
-    const duration = Math.max(140, SNAP_ANIM_DURATION * (diff / (Math.PI / 2)));
+    const duration = Math.max(60, SNAP_ANIM_DURATION * (diff / (Math.PI / 2)));
 
     const tick = (now: number) => {
       const t = Math.min((now - startTime) / duration, 1);
@@ -472,7 +472,7 @@ export class RubiksCube {
   }
 
   executeMove(move: MoveType, callback?: () => void, skipHistory = false) {
-    const ANIM_DURATION = 160;
+    const ANIM_DURATION = 100;
     const moveMap: Record<MoveType, { axis: AxisKey; layer: number; dir: number }> = {
       'R':  { axis: 'x', layer:  1, dir: -1 },
       "R'": { axis: 'x', layer:  1, dir:  1 },
