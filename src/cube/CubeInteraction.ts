@@ -430,6 +430,9 @@ export class CubeInteraction {
 
   private bindEvents() {
     const el = this.renderer.domElement;
+    // Prevent the browser from stealing touch events for scroll/zoom
+    el.style.touchAction = 'none';
+    el.style.userSelect = 'none';
     el.addEventListener('mousedown', this.onPointerDown, { passive: false });
     el.addEventListener('mousemove', this.onPointerMove, { passive: false });
     window.addEventListener('mouseup', this.onPointerUp);
