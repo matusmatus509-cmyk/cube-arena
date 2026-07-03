@@ -370,6 +370,35 @@ export default function App() {
   }, []);
   const [showTitle, setShowTitle] = useState<boolean>(() => localStorage.getItem(SHOW_TITLE_KEY) !== 'false');
   const [showPanel, setShowPanel] = useState(false);
+
+  // PWA install prompt
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installDismissed, setInstallDismissed] = useState(() => localStorage.getItem('pwa_dismissed') === '1');
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setInstallPrompt(null);
+  };
+
+  const handleInstallDismiss = () => {
+    setInstallDismissed(true);
+    localStorage.setItem('pwa_dismissed', '1');
+  };
+
+  const showInstallBar = !!installPrompt && !installDismissed;
   const [scrambling, setScrambling] = useState(false);
   const [solving, setSolving] = useState(false);
   const [showSolvedBanner, setShowSolvedBanner] = useState(false);
@@ -546,6 +575,25 @@ export default function App() {
         cubeScene={cubeSceneRef.current}
         onTitleToggle={setShowTitle}
       />
+
+      {/* PWA Install Banner */}
+      {showInstallBar && (
+        <div className="pwa-install-bar">
+          <div className="pwa-install-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </div>
+          <div className="pwa-install-text">
+            <strong>Nainštalovať CUBEMIX</strong>
+            <span>Pridaj na plochu ako app</span>
+          </div>
+          <button className="pwa-install-btn" onClick={handleInstall}>Stiahnuť</button>
+          <button className="pwa-install-dismiss" onClick={handleInstallDismiss}>✕</button>
+        </div>
+      )}
     </div>
   );
 }
