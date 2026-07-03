@@ -40,7 +40,7 @@ export interface DragSession {
 }
 
 /** Build a centered rounded-rectangle plane geometry for a sticker. */
-function createRoundedStickerGeometry(size: number, radius: number): THREE.ShapeGeometry {
+const createRoundedStickerGeometry = (size: number, radius: number): THREE.ShapeGeometry => {
   const half = size / 2;
   const r = Math.min(radius, half);
   const shape = new THREE.Shape();
@@ -54,7 +54,7 @@ function createRoundedStickerGeometry(size: number, radius: number): THREE.Shape
   shape.lineTo(-half, -half + r);
   shape.quadraticCurveTo(-half, -half, -half + r, -half);
   return new THREE.ShapeGeometry(shape, 6);
-}
+};
 
 export class RubiksCube {
   scene: THREE.Scene;
