@@ -150,9 +150,9 @@ function moveBPrime(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   s.B = rotateFaceCCW(state.B);
   [s.R[8], s.R[5], s.R[2]] = [state.U[2], state.U[1], state.U[0]];
-  [s.D[6], s.D[7], s.D[8]] = [state.R[8], s.R[5], s.R[2]];
-  [s.L[0], s.L[3], s.L[6]] = [state.D[6], s.D[7], s.D[8]];
-  [s.U[2], s.U[1], s.U[0]] = [state.L[0], s.L[3], s.L[6]];
+  [s.D[6], s.D[7], s.D[8]] = [state.R[8], state.R[5], state.R[2]];
+  [s.L[0], s.L[3], s.L[6]] = [state.D[6], state.D[7], state.D[8]];
+  [s.U[2], s.U[1], s.U[0]] = [state.L[0], state.L[3], state.L[6]];
   return s;
 }
 
@@ -161,9 +161,9 @@ function moveL(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   s.L = rotateFaceCW(state.L);
   [s.F[0], s.F[3], s.F[6]] = [state.U[0], state.U[3], state.U[6]];
-  [s.D[0], s.D[3], s.D[6]] = [state.F[0], s.F[3], s.F[6]];
-  [s.B[8], s.B[5], s.B[2]] = [state.D[0], s.D[3], s.D[6]];
-  [s.U[0], s.U[3], s.U[6]] = [state.B[8], s.B[5], s.B[2]];
+  [s.D[0], s.D[3], s.D[6]] = [state.F[0], state.F[3], state.F[6]];
+  [s.B[8], s.B[5], s.B[2]] = [state.D[0], state.D[3], state.D[6]];
+  [s.U[0], s.U[3], s.U[6]] = [state.B[8], state.B[5], state.B[2]];
   return s;
 }
 
@@ -171,9 +171,9 @@ function moveLPrime(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   s.L = rotateFaceCCW(state.L);
   [s.B[8], s.B[5], s.B[2]] = [state.U[0], state.U[3], state.U[6]];
-  [s.D[0], s.D[3], s.D[6]] = [state.B[8], s.B[5], s.B[2]];
-  [s.F[0], s.F[3], s.F[6]] = [state.D[0], s.D[3], s.D[6]];
-  [s.U[0], s.U[3], s.U[6]] = [state.F[0], s.F[3], s.F[6]];
+  [s.D[0], s.D[3], s.D[6]] = [state.B[8], state.B[5], state.B[2]];
+  [s.F[0], s.F[3], s.F[6]] = [state.D[0], state.D[3], state.D[6]];
+  [s.U[0], s.U[3], s.U[6]] = [state.F[0], state.F[3], state.F[6]];
   return s;
 }
 
@@ -182,9 +182,9 @@ function moveR(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   s.R = rotateFaceCW(state.R);
   [s.B[6], s.B[3], s.B[0]] = [state.U[2], state.U[5], state.U[8]];
-  [s.D[2], s.D[5], s.D[8]] = [state.B[6], s.B[3], s.B[0]];
-  [s.F[2], s.F[5], s.F[8]] = [state.D[2], s.D[5], s.D[8]];
-  [s.U[2], s.U[5], s.U[8]] = [state.F[2], s.F[5], s.F[8]];
+  [s.D[2], s.D[5], s.D[8]] = [state.B[6], state.B[3], state.B[0]];
+  [s.F[2], s.F[5], s.F[8]] = [state.D[2], state.D[5], state.D[8]];
+  [s.U[2], s.U[5], s.U[8]] = [state.F[2], state.F[5], state.F[8]];
   return s;
 }
 
@@ -192,9 +192,9 @@ function moveRPrime(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   s.R = rotateFaceCCW(state.R);
   [s.F[2], s.F[5], s.F[8]] = [state.U[2], state.U[5], state.U[8]];
-  [s.D[2], s.D[5], s.D[8]] = [state.F[2], s.F[5], s.F[8]];
-  [s.B[6], s.B[3], s.B[0]] = [state.D[2], s.D[5], s.D[8]];
-  [s.U[2], s.U[5], s.U[8]] = [state.B[6], s.B[3], s.B[0]];
+  [s.D[2], s.D[5], s.D[8]] = [state.F[2], state.F[5], state.F[8]];
+  [s.B[6], s.B[3], s.B[0]] = [state.D[2], state.D[5], state.D[8]];
+  [s.U[2], s.U[5], s.U[8]] = [state.B[6], state.B[3], state.B[0]];
   return s;
 }
 
@@ -203,18 +203,18 @@ function moveRPrime(state: CubeStateData): CubeStateData {
 function moveM(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   [s.F[1], s.F[4], s.F[7]] = [state.U[1], state.U[4], state.U[7]];
-  [s.D[1], s.D[4], s.D[7]] = [state.F[1], s.F[4], s.F[7]];
-  [s.B[7], s.B[4], s.B[1]] = [state.D[1], s.D[4], s.D[7]];
-  [s.U[1], s.U[4], s.U[7]] = [state.B[7], s.B[4], s.B[1]];
+  [s.D[1], s.D[4], s.D[7]] = [state.F[1], state.F[4], state.F[7]];
+  [s.B[7], s.B[4], s.B[1]] = [state.D[1], state.D[4], state.D[7]];
+  [s.U[1], s.U[4], s.U[7]] = [state.B[7], state.B[4], state.B[1]];
   return s;
 }
 
 function moveMPrime(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   [s.B[7], s.B[4], s.B[1]] = [state.U[1], state.U[4], state.U[7]];
-  [s.D[1], s.D[4], s.D[7]] = [state.B[7], s.B[4], s.B[1]];
-  [s.F[1], s.F[4], s.F[7]] = [state.D[1], s.D[4], s.D[7]];
-  [s.U[1], s.U[4], s.U[7]] = [state.F[1], s.F[4], s.F[7]];
+  [s.D[1], s.D[4], s.D[7]] = [state.B[7], state.B[4], state.B[1]];
+  [s.F[1], s.F[4], s.F[7]] = [state.D[1], state.D[4], state.D[7]];
+  [s.U[1], s.U[4], s.U[7]] = [state.F[1], state.F[4], state.F[7]];
   return s;
 }
 
@@ -222,18 +222,18 @@ function moveMPrime(state: CubeStateData): CubeStateData {
 function moveE(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   [s.L[3], s.L[4], s.L[5]] = [state.F[3], state.F[4], state.F[5]];
-  [s.B[3], s.B[4], s.B[5]] = [state.L[3], s.L[4], s.L[5]];
-  [s.R[3], s.R[4], s.R[5]] = [state.B[3], s.B[4], s.B[5]];
-  [s.F[3], s.F[4], s.F[5]] = [state.R[3], s.R[4], s.R[5]];
+  [s.B[3], s.B[4], s.B[5]] = [state.L[3], state.L[4], state.L[5]];
+  [s.R[3], s.R[4], s.R[5]] = [state.B[3], state.B[4], state.B[5]];
+  [s.F[3], s.F[4], s.F[5]] = [state.R[3], state.R[4], state.R[5]];
   return s;
 }
 
 function moveEPrime(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   [s.R[3], s.R[4], s.R[5]] = [state.F[3], state.F[4], state.F[5]];
-  [s.B[3], s.B[4], s.B[5]] = [state.R[3], s.R[4], s.R[5]];
-  [s.L[3], s.L[4], s.L[5]] = [state.B[3], s.B[4], s.B[5]];
-  [s.F[3], s.F[4], s.F[5]] = [state.L[3], s.L[4], s.L[5]];
+  [s.B[3], s.B[4], s.B[5]] = [state.R[3], state.R[4], state.R[5]];
+  [s.L[3], s.L[4], s.L[5]] = [state.B[3], state.B[4], state.B[5]];
+  [s.F[3], s.F[4], s.F[5]] = [state.L[3], state.L[4], state.L[5]];
   return s;
 }
 
@@ -241,18 +241,18 @@ function moveEPrime(state: CubeStateData): CubeStateData {
 function moveS(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   [s.R[1], s.R[4], s.R[7]] = [state.U[3], state.U[4], state.U[5]];
-  [s.D[5], s.D[4], s.D[3]] = [state.R[1], s.R[4], s.R[7]];
-  [s.L[7], s.L[4], s.L[1]] = [state.D[5], s.D[4], s.D[3]];
-  [s.U[3], s.U[4], s.U[5]] = [state.L[7], s.L[4], s.L[1]];
+  [s.D[5], s.D[4], s.D[3]] = [state.R[1], state.R[4], state.R[7]];
+  [s.L[7], s.L[4], s.L[1]] = [state.D[5], state.D[4], state.D[3]];
+  [s.U[3], s.U[4], s.U[5]] = [state.L[7], state.L[4], state.L[1]];
   return s;
 }
 
 function moveSPrime(state: CubeStateData): CubeStateData {
   const s = cloneState(state);
   [s.L[7], s.L[4], s.L[1]] = [state.U[3], state.U[4], state.U[5]];
-  [s.D[5], s.D[4], s.D[3]] = [state.L[7], s.L[4], s.L[1]];
-  [s.R[1], s.R[4], s.R[7]] = [state.D[5], s.D[4], s.D[3]];
-  [s.U[3], s.U[4], s.U[5]] = [state.R[1], s.R[4], s.R[7]];
+  [s.D[5], s.D[4], s.D[3]] = [state.L[7], state.L[4], state.L[1]];
+  [s.R[1], s.R[4], s.R[7]] = [state.D[5], state.D[4], state.D[3]];
+  [s.U[3], s.U[4], s.U[5]] = [state.R[1], state.R[4], state.R[7]];
   return s;
 }
 
