@@ -4,6 +4,7 @@ import { isSolved, MoveType, CubeStateData } from './cube/CubeState';
 
 const PRESET_STORAGE_KEY = 'cubemix_presets';
 const MAX_PRESETS = 5;
+const BG_STORAGE_KEY = 'cubemix_bg';
 
 interface Preset {
   id: string;
@@ -25,6 +26,22 @@ function savePresets(presets: Preset[]) {
 
 const SCRAMBLE_MOVES: MoveType[] = ['U', "U'", 'D', "D'", 'F', "F'", 'B', "B'", 'L', "L'", 'R', "R'"];
 
+function applyBackground(url: string) {
+  const root = document.querySelector<HTMLElement>('.app-root');
+  if (!root) return;
+  if (url) {
+    root.style.backgroundImage = `url(${url})`;
+    root.style.backgroundSize = 'cover';
+    root.style.backgroundPosition = 'center';
+    root.style.backgroundRepeat = 'no-repeat';
+  } else {
+    root.style.backgroundImage = '';
+    root.style.backgroundSize = '';
+    root.style.backgroundPosition = '';
+    root.style.backgroundRepeat = '';
+  }
+}
+
 // Force Panel Component
 function ForcePanel({ 
     isOpen, 
@@ -40,6 +57,8 @@ function ForcePanel({
     const [presets, setPresets] = useState<Preset[]>([]);
     const [namingSlot, setNamingSlot] = useState<string | null>(null);
     const [nameInput, setNameInput] = useState('');
+    const [bgUrl, setBgUrl] = useState<string>(() => localStorage.getItem(BG_STORAGE_KEY) ?? '');
+    const bgInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
       if (isOpen) {
@@ -48,8 +67,30 @@ function ForcePanel({
         setStatus('');
         setNamingSlot(null);
         setNameInput('');
+        setBgUrl(localStorage.getItem(BG_STORAGE_KEY) ?? '');
       }
     }, [cubeScene, isOpen]);
+
+    const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        localStorage.setItem(BG_STORAGE_KEY, dataUrl);
+        setBgUrl(dataUrl);
+        applyBackground(dataUrl);
+        setStatus('Pozadie nastavené');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    const handleRemoveBg = () => {
+      localStorage.removeItem(BG_STORAGE_KEY);
+      setBgUrl('');
+      applyBackground('');
+      setStatus('Pozadie odstránené');
+    };
 
     if (!isOpen) return null;
 
@@ -121,6 +162,42 @@ function ForcePanel({
               <p><strong>Fáza 1:</strong> Dvojité ťuknutie na stred-vrch aktivuje Force Mode. Skryté plochy si udržiavajú farby.</p>
               <p><strong>Fáza 2:</strong> Otočte kocku aby boli pôvodne viditeľné plochy skryté, potom urobte L a potom L&apos;.</p>
             </div>
+
+            {/* ── Divider ── */}
+            <div className="force-divider" />
+
+            {/* ── Background section ── */}
+            <div className="force-section-title">Pozadie</div>
+
+            {bgUrl ? (
+              <div className="bg-preview-wrap">
+                <img className="bg-preview-img" src={bgUrl} alt="Aktuálne pozadie" />
+                <div className="bg-preview-actions">
+                  <button className="force-btn" onClick={() => bgInputRef.current?.click()}>
+                    Zmeniť fotku
+                  </button>
+                  <button className="force-btn force-btn-danger" onClick={handleRemoveBg}>
+                    Odstrániť
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button className="force-btn bg-upload-btn" onClick={() => bgInputRef.current?.click()}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                Nahrať fotku zo zariadenia
+              </button>
+            )}
+
+            <input
+              ref={bgInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleBgUpload}
+            />
 
             {/* ── Divider ── */}
             <div className="force-divider" />
@@ -243,6 +320,12 @@ export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
   const cubeSceneRef = useRef<CubeScene | null>(null);
   const [solved, setSolved] = useState(true);
+
+  // Apply saved background image immediately on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(BG_STORAGE_KEY);
+    if (saved) applyBackground(saved);
+  }, []);
   const [showPanel, setShowPanel] = useState(false);
   const [scrambling, setScrambling] = useState(false);
   const [solving, setSolving] = useState(false);
