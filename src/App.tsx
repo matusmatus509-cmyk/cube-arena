@@ -4,13 +4,6 @@ import { isSolved, MoveType } from './cube/CubeState';
 
 const SCRAMBLE_MOVES: MoveType[] = ['U', "U'", 'D', "D'", 'F', "F'", 'B', "B'", 'L', "L'", 'R', "R'"];
 
-const MOVE_GROUPS = [
-  { label: 'Up / Down', moves: ['U', "U'", 'D', "D'"] as MoveType[] },
-  { label: 'Front / Back', moves: ['F', "F'", 'B', "B'"] as MoveType[] },
-  { label: 'Left / Right', moves: ['L', "L'", 'R', "R'"] as MoveType[] },
-  { label: 'Middle Slices', moves: ['M', "M'", 'E', "E'", 'S', "S'"] as MoveType[] },
-];
-
 // Force Panel Component
 function ForcePanel({ 
     isOpen, 
@@ -24,7 +17,6 @@ function ForcePanel({
     const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
     const [status, setStatus] = useState<string>('');
 
-    // Sync with cubeScene whenever the panel opens
     useEffect(() => {
       if (isOpen && cubeScene) {
         setForceSnapshotExists(!!cubeScene.getForceSnapshot());
@@ -51,7 +43,7 @@ function ForcePanel({
       <div className="force-panel-overlay" onClick={onClose}>
         <div className="force-panel" onClick={e => e.stopPropagation()}>
           <div className="force-panel-header">
-            <h2>🔮 Force Mode (Secret)</h2>
+            <h2>Force Mode (Secret)</h2>
             <button onClick={onClose}>✕</button>
           </div>
 
@@ -72,8 +64,8 @@ function ForcePanel({
             {status && <div className="force-status">{status}</div>}
 
             <div className="force-hint">
-              <p><strong>Phase 1:</strong> Double-tap center-top area to activate. Hidden faces → force colors.</p>
-              <p><strong>Phase 2:</strong> Rotate cube to hide originally visible faces, then do L → L' move.</p>
+              <p><strong>Phase 1:</strong> Double-tap center-top area to activate. Hidden faces force colors.</p>
+              <p><strong>Phase 2:</strong> Rotate cube to hide originally visible faces, then do L then L&apos; move.</p>
             </div>
           </div>
         </div>
@@ -81,12 +73,74 @@ function ForcePanel({
     );
   }
 
+// Side Panel Component
+function SidePanel({
+  isOpen,
+  onClose,
+  onScramble,
+  onSolve,
+  scrambling,
+  solving,
+  solved,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onScramble: () => void;
+  onSolve: () => void;
+  scrambling: boolean;
+  solving: boolean;
+  solved: boolean;
+}) {
+  const busy = scrambling || solving;
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div className="overlay" onClick={onClose} />
+      <div className="drawer">
+        <div className="drawer-head">
+          <h2>MENU</h2>
+          <button className="drawer-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="drawer-actions">
+          <button
+            className="drawer-action-btn"
+            onClick={() => { onScramble(); onClose(); }}
+            disabled={busy}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" />
+              <polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" />
+              <line x1="4" y1="4" x2="9" y2="9" />
+            </svg>
+            <span>{scrambling ? 'Scrambling...' : 'Scramble'}</span>
+          </button>
+
+          <button
+            className={`drawer-action-btn drawer-action-solve ${solving ? 'active' : ''}`}
+            onClick={() => { onSolve(); onClose(); }}
+            disabled={busy || solved}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <span>{solving ? 'Solving...' : 'Solve'}</span>
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
   const cubeSceneRef = useRef<CubeScene | null>(null);
   const [solved, setSolved] = useState(true);
   const [moveCount, setMoveCount] = useState(0);
-  const [showMoves, setShowMoves] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
   const [scrambling, setScrambling] = useState(false);
   const [solving, setSolving] = useState(false);
   const [showSolvedBanner, setShowSolvedBanner] = useState(false);
@@ -109,8 +163,6 @@ export default function App() {
       }
     });
     scene.onForceActiveChange = setForceActive;
-    // Single source of truth for the move counter: every executed move
-    // (drag, panel button, scramble step, solve step) increments it.
     scene.onUserMove = () => setMoveCount(prev => prev + 1);
     return () => {
       if (titlePressTimer.current) clearTimeout(titlePressTimer.current);
@@ -140,9 +192,9 @@ export default function App() {
       let move: MoveType;
       do { move = SCRAMBLE_MOVES[Math.floor(Math.random() * SCRAMBLE_MOVES.length)]; } while (move[0] === lastFace);
       lastFace = move[0];
-    cubeSceneRef.current?.executeMove(move);
-    count++;
-    setTimeout(next, 90);
+      cubeSceneRef.current?.executeMove(move);
+      count++;
+      setTimeout(next, 90);
     };
     next();
   }, [scrambling, solving]);
@@ -179,12 +231,6 @@ export default function App() {
     setShowSolvedBanner(false);
   }, []);
 
-  const handleMove = useCallback((move: MoveType) => {
-    if (!cubeSceneRef.current) return;
-    cubeSceneRef.current.executeMove(move);
-    setSolved(false);
-  }, []);
-
   const busy = scrambling || solving;
 
   const lastTapRef = useRef<number>(0);
@@ -200,7 +246,6 @@ export default function App() {
     lastTapRef.current = now;
   }, []);
 
-  // Title long press handlers
   const onTitleMouseDown = () => {
     titlePressTimer.current = window.setTimeout(() => {
       setShowForcePanel(true);
@@ -216,15 +261,16 @@ export default function App() {
 
   return (
     <div className="app-root">
-      {/* Secret trigger area for Phase 1 */}
+      {/* Secret trigger area */}
       <div 
         className="secret-trigger-area" 
         onMouseDown={handleSecretTrigger}
         onTouchStart={handleSecretTrigger}
       />
-      {/* ── Top bar ── */}
+
+      {/* Top bar */}
       <header className="topbar">
-        <button className="topbar-icon" onClick={() => setShowMoves(!showMoves)}>
+        <button className="topbar-icon" onClick={() => setShowPanel(!showPanel)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
           </svg>
@@ -248,35 +294,18 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Solved toast ── */}
+      {/* Solved toast */}
       {showSolvedBanner && (
-        <div className="solved-toast">✅ SOLVED!</div>
+        <div className="solved-toast">SOLVED!</div>
       )}
 
-      {/* ── Cube area ── */}
+      {/* Cube area */}
       <div className="cube-area">
         <div className="canvas-wrap" ref={mountRef} />
       </div>
 
-      {/* ── Bottom toolbar ── */}
+      {/* Bottom toolbar — Reset only */}
       <div className="toolbar">
-        <button className="tool" onClick={handleScramble} disabled={busy}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" />
-            <polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" />
-            <line x1="4" y1="4" x2="9" y2="9" />
-          </svg>
-          <span>{scrambling ? '...' : 'Scramble'}</span>
-        </button>
-
-        <button className={`tool tool-primary ${solving ? 'active' : ''}`} onClick={handleSolve} disabled={busy || solved}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-          <span>{solving ? '...' : 'Solve'}</span>
-        </button>
-
         <button className="tool" onClick={handleReset} disabled={busy}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
@@ -285,32 +314,18 @@ export default function App() {
         </button>
       </div>
 
-      {/* ── Move drawer ── */}
-      {showMoves && (
-        <>
-          <div className="overlay" onClick={() => setShowMoves(false)} />
-          <div className="drawer">
-            <div className="drawer-head">
-              <h2>MOVES</h2>
-              <button className="drawer-close" onClick={() => setShowMoves(false)}>✕</button>
-            </div>
-            {MOVE_GROUPS.map(group => (
-              <div key={group.label} className="move-section">
-                <div className="move-section-title">{group.label}</div>
-                <div className="move-grid">
-                  {group.moves.map(move => (
-                    <button key={move} className="move-chip" onClick={() => handleMove(move)} disabled={busy}>
-                      {move}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+      {/* Side panel with Scramble + Solve */}
+      <SidePanel
+        isOpen={showPanel}
+        onClose={() => setShowPanel(false)}
+        onScramble={handleScramble}
+        onSolve={handleSolve}
+        scrambling={scrambling}
+        solving={solving}
+        solved={solved}
+      />
 
-      {/* ── Force Panel ── */}
+      {/* Force Panel */}
       <ForcePanel 
         isOpen={showForcePanel}
         onClose={() => setShowForcePanel(false)}
