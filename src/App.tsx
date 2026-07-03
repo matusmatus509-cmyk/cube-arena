@@ -139,7 +139,6 @@ export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
   const cubeSceneRef = useRef<CubeScene | null>(null);
   const [solved, setSolved] = useState(true);
-  const [moveCount, setMoveCount] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
   const [scrambling, setScrambling] = useState(false);
   const [solving, setSolving] = useState(false);
@@ -163,7 +162,6 @@ export default function App() {
       }
     });
     scene.onForceActiveChange = setForceActive;
-    scene.onUserMove = () => setMoveCount(prev => prev + 1);
     return () => {
       if (titlePressTimer.current) clearTimeout(titlePressTimer.current);
       scene.destroy(); cubeSceneRef.current = null;
@@ -176,7 +174,6 @@ export default function App() {
     setSolving(false);
     setScrambling(true);
     scrambleRef.current = true;
-    setMoveCount(0);
     setSolved(false);
     setShowSolvedBanner(false);
     cubeSceneRef.current.clearHistory();
@@ -227,7 +224,6 @@ export default function App() {
     setSolving(false);
     cubeSceneRef.current.reset();
     cubeSceneRef.current.resetRotation();
-    setMoveCount(0);
     setShowSolvedBanner(false);
   }, []);
 
@@ -286,10 +282,6 @@ export default function App() {
           CUBEMIX
         </span>
         <div className="topbar-stats">
-          <div className="stat">
-            <span className="stat-num">{moveCount}</span>
-            <span className="stat-lbl">moves</span>
-          </div>
           <div className={`status-dot ${solved ? 'dot-solved' : 'dot-unsolved'}`} />
         </div>
       </header>
