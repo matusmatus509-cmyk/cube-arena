@@ -5,6 +5,7 @@ import { isSolved, MoveType, CubeStateData } from './cube/CubeState';
 const PRESET_STORAGE_KEY = 'cubemix_presets';
 const MAX_PRESETS = 5;
 const BG_STORAGE_KEY = 'cubemix_bg';
+const SHOW_TITLE_KEY = 'cubemix_show_title';
 
 interface Preset {
   id: string;
@@ -46,11 +47,15 @@ function applyBackground(url: string) {
 function ForcePanel({ 
     isOpen, 
     onClose, 
-    cubeScene, 
+    cubeScene,
+    showTitle,
+    onShowTitleChange,
   }: { 
     isOpen: boolean; 
     onClose: () => void; 
-    cubeScene: CubeScene | null; 
+    cubeScene: CubeScene | null;
+    showTitle: boolean;
+    onShowTitleChange: (val: boolean) => void;
   }) {
     const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
     const [status, setStatus] = useState<string>('');
@@ -202,6 +207,25 @@ function ForcePanel({
             {/* ── Divider ── */}
             <div className="force-divider" />
 
+            {/* ── Title toggle section ── */}
+            <div className="force-section-title">Zobrazenie</div>
+            <div className="force-toggle-row">
+              <span className="force-toggle-label">Nápis v hornej lište</span>
+              <button
+                className={`force-toggle-btn${showTitle ? ' force-toggle-on' : ''}`}
+                onClick={() => {
+                  const next = !showTitle;
+                  localStorage.setItem(SHOW_TITLE_KEY, next ? '1' : '0');
+                  onShowTitleChange(next);
+                }}
+              >
+                {showTitle ? 'ZAP' : 'VYP'}
+              </button>
+            </div>
+
+            {/* ── Divider ── */}
+            <div className="force-divider" />
+
             {/* ── Preset snapshots section ── */}
             <div className="force-section-title">Presety kocky</div>
 
@@ -260,6 +284,7 @@ function SidePanel({
   onClose,
   onScramble,
   onSolve,
+  onReset,
   scrambling,
   solving,
   solved,
@@ -268,6 +293,7 @@ function SidePanel({
   onClose: () => void;
   onScramble: () => void;
   onSolve: () => void;
+  onReset: () => void;
   scrambling: boolean;
   solving: boolean;
   solved: boolean;
@@ -310,6 +336,17 @@ function SidePanel({
             </svg>
             <span>{solving ? 'Solving...' : 'Solve'}</span>
           </button>
+
+          <button
+            className="drawer-action-btn drawer-action-reset"
+            onClick={() => { onReset(); onClose(); }}
+            disabled={busy}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            <span>Reset</span>
+          </button>
         </div>
       </div>
     </>
@@ -332,6 +369,10 @@ export default function App() {
   const [showSolvedBanner, setShowSolvedBanner] = useState(false);
   const [showForcePanel, setShowForcePanel] = useState(false);
   const [, setForceActive] = useState(false);
+  const [showTitle, setShowTitle] = useState<boolean>(() => {
+    const stored = localStorage.getItem(SHOW_TITLE_KEY);
+    return stored === null ? false : stored === '1';
+  });
   const scrambleRef = useRef(false);
   const solveRef = useRef(false);
   const titlePressTimer = useRef<number | null>(null);
@@ -458,16 +499,27 @@ export default function App() {
             <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        <span 
-          className="topbar-title" 
-          onMouseDown={onTitleMouseDown}
-          onMouseUp={onTitleMouseUp}
-          onMouseLeave={onTitleMouseUp}
-          onTouchStart={onTitleMouseDown}
-          onTouchEnd={onTitleMouseUp}
-        >
-          CUBEMIX
-        </span>
+        {showTitle ? (
+          <span 
+            className="topbar-title" 
+            onMouseDown={onTitleMouseDown}
+            onMouseUp={onTitleMouseUp}
+            onMouseLeave={onTitleMouseUp}
+            onTouchStart={onTitleMouseDown}
+            onTouchEnd={onTitleMouseUp}
+          >
+            CUBEMIX
+          </span>
+        ) : (
+          <span
+            className="topbar-title topbar-title-hidden"
+            onMouseDown={onTitleMouseDown}
+            onMouseUp={onTitleMouseUp}
+            onMouseLeave={onTitleMouseUp}
+            onTouchStart={onTitleMouseDown}
+            onTouchEnd={onTitleMouseUp}
+          />
+        )}
         <div className="topbar-stats" />
       </header>
 
@@ -481,22 +533,13 @@ export default function App() {
         <div className="canvas-wrap" ref={mountRef} />
       </div>
 
-      {/* Bottom toolbar — Reset only */}
-      <div className="toolbar">
-        <button className="tool" onClick={handleReset} disabled={busy}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-          </svg>
-          <span>Reset</span>
-        </button>
-      </div>
-
-      {/* Side panel with Scramble + Solve */}
+      {/* Side panel with Scramble + Solve + Reset */}
       <SidePanel
         isOpen={showPanel}
         onClose={() => setShowPanel(false)}
         onScramble={handleScramble}
         onSolve={handleSolve}
+        onReset={handleReset}
         scrambling={scrambling}
         solving={solving}
         solved={solved}
@@ -507,6 +550,8 @@ export default function App() {
         isOpen={showForcePanel}
         onClose={() => setShowForcePanel(false)}
         cubeScene={cubeSceneRef.current}
+        showTitle={showTitle}
+        onShowTitleChange={setShowTitle}
       />
     </div>
   );

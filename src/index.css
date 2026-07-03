@@ -546,6 +546,59 @@ html, body {
 }
 .force-hint strong { color: var(--text); }
 
+/* ── TITLE HIDDEN ── */
+.topbar-title-hidden {
+  flex: 1;
+  pointer-events: auto;
+}
+
+/* ── FORCE TOGGLE ── */
+.force-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.force-toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.force-toggle-btn {
+  padding: 6px 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text2);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.force-toggle-btn.force-toggle-on {
+  color: var(--green);
+  border-color: rgba(34,197,94,0.3);
+  background: rgba(34,197,94,0.08);
+}
+
+/* ── DRAWER RESET ── */
+.drawer-action-reset {
+  color: var(--text2);
+  border-color: var(--border);
+}
+.drawer-action-reset svg { color: var(--text2); }
+.drawer-action-reset:active:not(:disabled) {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.14);
+}
+
 /* ── SECRET TRIGGER ── */
 .secret-trigger-area {
   position: absolute;
