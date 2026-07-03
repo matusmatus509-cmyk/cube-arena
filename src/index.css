@@ -470,6 +470,72 @@ html, body {
 .force-btn-danger { color: #f87171; border-color: rgba(248,113,113,0.2); }
 .force-btn-danger:active { background: rgba(248,113,113,0.08); }
 
+.force-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+.force-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.preset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.preset-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preset-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.preset-btn {
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+}
+
+.preset-name-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.preset-input {
+  flex: 1;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+}
+.preset-input:focus {
+  border-color: rgba(59,130,246,0.4);
+  background: rgba(59,130,246,0.05);
+}
+.preset-input::placeholder { color: var(--text2); }
+
 .force-hint {
   font-size: 12px;
   color: var(--text2);

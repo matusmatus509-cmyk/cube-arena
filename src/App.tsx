@@ -1,6 +1,27 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { CubeScene } from './cube/CubeScene';
-import { isSolved, MoveType } from './cube/CubeState';
+import { isSolved, MoveType, CubeStateData } from './cube/CubeState';
+
+const PRESET_STORAGE_KEY = 'cubemix_presets';
+const MAX_PRESETS = 5;
+
+interface Preset {
+  id: string;
+  name: string;
+  state: CubeStateData;
+  savedAt: number;
+}
+
+function loadPresets(): Preset[] {
+  try {
+    const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function savePresets(presets: Preset[]) {
+  localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(presets));
+}
 
 const SCRAMBLE_MOVES: MoveType[] = ['U', "U'", 'D', "D'", 'F', "F'", 'B', "B'", 'L', "L'", 'R', "R'"];
 
@@ -16,10 +37,17 @@ function ForcePanel({
   }) {
     const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
     const [status, setStatus] = useState<string>('');
+    const [presets, setPresets] = useState<Preset[]>([]);
+    const [namingSlot, setNamingSlot] = useState<string | null>(null);
+    const [nameInput, setNameInput] = useState('');
 
     useEffect(() => {
-      if (isOpen && cubeScene) {
-        setForceSnapshotExists(!!cubeScene.getForceSnapshot());
+      if (isOpen) {
+        if (cubeScene) setForceSnapshotExists(!!cubeScene.getForceSnapshot());
+        setPresets(loadPresets());
+        setStatus('');
+        setNamingSlot(null);
+        setNameInput('');
       }
     }, [cubeScene, isOpen]);
 
@@ -29,44 +57,120 @@ function ForcePanel({
       if (!cubeScene) return;
       cubeScene.setForceSnapshot();
       setForceSnapshotExists(true);
-      setStatus('Force Cube SNAPSHOT stored (exact copy of current cube)');
+      setStatus('Force Cube snapshot uložený');
     };
 
     const handleClear = () => {
       if (!cubeScene) return;
       cubeScene.clearForceSnapshot();
       setForceSnapshotExists(false);
-      setStatus('Force Cube cleared');
+      setStatus('Force Cube vymazaný');
+    };
+
+    const handleSavePreset = () => {
+      if (!cubeScene || !namingSlot) return;
+      const name = nameInput.trim() || `Preset ${presets.length + 1}`;
+      const state = cubeScene.getState();
+      const updated = [
+        ...presets.filter(p => p.id !== namingSlot),
+        { id: namingSlot, name, state, savedAt: Date.now() },
+      ].slice(-MAX_PRESETS);
+      savePresets(updated);
+      setPresets(updated);
+      setNamingSlot(null);
+      setNameInput('');
+      setStatus(`Preset "${name}" uložený`);
+    };
+
+    const handleLoadPreset = (preset: Preset) => {
+      if (!cubeScene) return;
+      cubeScene.setState(preset.state);
+      setStatus(`Načítaný: "${preset.name}"`);
+    };
+
+    const handleDeletePreset = (id: string) => {
+      const updated = presets.filter(p => p.id !== id);
+      savePresets(updated);
+      setPresets(updated);
     };
 
     return (
       <div className="force-panel-overlay" onClick={onClose}>
         <div className="force-panel" onClick={e => e.stopPropagation()}>
           <div className="force-panel-header">
-            <h2>Force Mode (Secret)</h2>
+            <h2>Tajné nastavenia</h2>
             <button onClick={onClose}>✕</button>
           </div>
 
           <div className="force-panel-content">
-            <div className="force-status">
-              Force Cube: {forceSnapshotExists ? 'STORED ✓' : 'none'}
-            </div>
 
+            {/* ── Force snapshot section ── */}
+            <div className="force-section-title">Force Mode</div>
+            <div className="force-status">
+              Force Cube: {forceSnapshotExists ? 'ULOŽENÝ ✓' : 'žiadny'}
+            </div>
             <div className="force-buttons">
               <button onClick={handleSetSnapshot} className="force-btn">
-                Snapshot Force Cube (Exact Copy)
+                Snapshot Force Cube (presná kópia)
               </button>
               <button onClick={handleClear} className="force-btn force-btn-danger">
-                Clear Force Cube
+                Vymazať Force Cube
               </button>
             </div>
+            <div className="force-hint">
+              <p><strong>Fáza 1:</strong> Dvojité ťuknutie na stred-vrch aktivuje Force Mode. Skryté plochy si udržiavajú farby.</p>
+              <p><strong>Fáza 2:</strong> Otočte kocku aby boli pôvodne viditeľné plochy skryté, potom urobte L a potom L&apos;.</p>
+            </div>
+
+            {/* ── Divider ── */}
+            <div className="force-divider" />
+
+            {/* ── Preset snapshots section ── */}
+            <div className="force-section-title">Presety kocky</div>
+
+            {presets.length === 0 && (
+              <div className="force-status">Žiadne presety uložené</div>
+            )}
+
+            {presets.map(preset => (
+              <div key={preset.id} className="preset-row">
+                <span className="preset-name">{preset.name}</span>
+                <div className="preset-actions">
+                  <button className="force-btn preset-btn" onClick={() => handleLoadPreset(preset)}>
+                    Načítať
+                  </button>
+                  <button className="force-btn force-btn-danger preset-btn" onClick={() => handleDeletePreset(preset.id)}>
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {presets.length < MAX_PRESETS && (
+              namingSlot ? (
+                <div className="preset-name-row">
+                  <input
+                    className="preset-input"
+                    placeholder="Názov presetu..."
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSavePreset(); }}
+                    autoFocus
+                  />
+                  <button className="force-btn" onClick={handleSavePreset}>Uložiť</button>
+                  <button className="force-btn force-btn-danger" onClick={() => setNamingSlot(null)}>✕</button>
+                </div>
+              ) : (
+                <button
+                  className="force-btn"
+                  onClick={() => { setNamingSlot(`preset_${Date.now()}`); setNameInput(''); }}
+                >
+                  + Uložiť aktuálny stav kocky
+                </button>
+              )
+            )}
 
             {status && <div className="force-status">{status}</div>}
-
-            <div className="force-hint">
-              <p><strong>Phase 1:</strong> Double-tap center-top area to activate. Hidden faces force colors.</p>
-              <p><strong>Phase 2:</strong> Rotate cube to hide originally visible faces, then do L then L&apos; move.</p>
-            </div>
           </div>
         </div>
       </div>
@@ -281,9 +385,7 @@ export default function App() {
         >
           CUBEMIX
         </span>
-        <div className="topbar-stats">
-          <div className={`status-dot ${solved ? 'dot-solved' : 'dot-unsolved'}`} />
-        </div>
+        <div className="topbar-stats" />
       </header>
 
       {/* Solved toast */}
