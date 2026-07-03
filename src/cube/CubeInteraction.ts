@@ -24,6 +24,10 @@ interface DragState {
   screenDir: { x: number; y: number };
   angle: number;
   chosenCandidate: CandidateDrag;
+  // For flick detection: last angle + timestamp and smoothed angular velocity (rad/ms)
+  lastAngle: number;
+  lastTime: number;
+  velocity: number;
 }
 
 interface PointerState {
@@ -178,27 +182,37 @@ export class CubeInteraction {
    * This ensures one natural swipe = one layer turn.
    */
   private computeSensitivity(): number {
-    // Project a cube-sized vector into screen pixels
     // The cube spans roughly 3 units (from -1.5 to +1.5 in local space).
     const cubeHalfSize = 1.5;
 
-    // Get two points on the cube in world space and project to screen
     const rect = this.renderer.domElement.getBoundingClientRect();
+    this.camera.updateMatrixWorld();
+
+    // Measure the cube's screen size along the CAMERA's right axis (always
+    // parallel to the screen) instead of the cube's local X axis. This makes
+    // the measurement independent of how the cube is currently rotated, so the
+    // swipe→angle ratio stays identical whether the cube (or force mode) has
+    // moved it into any orientation.
+    const camRight = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).normalize();
+
     const center = new THREE.Vector3(0, 0, 0);
     center.applyMatrix4(this.cubeGroup.matrixWorld);
-    center.project(this.camera);
-    const centerPx = (center.x * 0.5 + 0.5) * rect.width;
+    const edge = center.clone().add(camRight.multiplyScalar(cubeHalfSize));
 
-    const edge = new THREE.Vector3(cubeHalfSize, 0, 0);
-    edge.applyMatrix4(this.cubeGroup.matrixWorld);
-    edge.project(this.camera);
-    const edgePx = (edge.x * 0.5 + 0.5) * rect.width;
+    const toPx = (v: THREE.Vector3) => {
+      const p = v.clone().project(this.camera);
+      return { x: (p.x * 0.5 + 0.5) * rect.width, y: (-p.y * 0.5 + 0.5) * rect.height };
+    };
+    const cPx = toPx(center);
+    const ePx = toPx(edge);
+    // Full 2D screen distance so the measure never collapses due to projection.
+    const cubeScreenRadius = Math.hypot(ePx.x - cPx.x, ePx.y - cPx.y);
 
-    const cubeScreenRadius = Math.abs(edgePx - centerPx);
-    // Swipe across ~1.2× the cube diameter = 90°
-    // One natural swipe across a face = one full turn, with a tiny margin
-    const swipeForFullTurn = cubeScreenRadius * 2 * 1.2;
-    if (swipeForFullTurn < 10) return 0.009; // fallback
+    // The layer follows the finger, but at a slower ratio: a full 90° turn
+    // requires a longer swipe (~2.6× the cube diameter). This makes the layer
+    // rotate noticeably slower than the finger while still moving with it.
+    const swipeForFullTurn = cubeScreenRadius * 2 * 2.6;
+    if (swipeForFullTurn < 10) return 0.004; // fallback
     return (Math.PI / 2) / swipeForFullTurn;
   }
 
@@ -226,7 +240,9 @@ export class CubeInteraction {
   /* ── Event binding ── */
 
   private onPointerDown = (e: MouseEvent | TouchEvent) => {
-    if (this.cube.isCurrentlyAnimating() || this.cube.isDragging()) return;
+    // Block new input while a drag, snap-settle, or programmatic animation
+    // is still in progress — prevents a second turn from starting mid-snap.
+    if (this.cube.isBusy()) return;
     e.preventDefault();
 
     const p = this.pos(e);
@@ -348,6 +364,9 @@ export class CubeInteraction {
             screenDir: winner.screenDir,
             angle: 0,
             chosenCandidate: winner,
+            lastAngle: 0,
+            lastTime: performance.now(),
+            velocity: 0,
           };
         }
 
@@ -372,6 +391,16 @@ export class CubeInteraction {
       const rawAngle = dist * sens;
       const clampedAngle = Math.max(-halfPi, Math.min(halfPi, rawAngle));
       this.cube.setDragAngle(clampedAngle);
+
+      // Track angular velocity (rad/ms) with light smoothing for flick detection.
+      const nowT = performance.now();
+      const dtA = nowT - this.ptr.drag.lastTime;
+      if (dtA > 0) {
+        const instV = (clampedAngle - this.ptr.drag.lastAngle) / dtA;
+        this.ptr.drag.velocity = this.ptr.drag.velocity * 0.6 + instV * 0.4;
+        this.ptr.drag.lastAngle = clampedAngle;
+        this.ptr.drag.lastTime = nowT;
+      }
     }
 
     this.ptr.lastX = p.x;
@@ -388,7 +417,13 @@ export class CubeInteraction {
     }
 
     if (this.cube.isDragging()) {
-      this.cube.endDrag();
+      // If the finger paused before lifting, the flick is stale — ignore it.
+      let releaseVelocity = 0;
+      if (this.ptr.drag) {
+        const idle = performance.now() - this.ptr.drag.lastTime;
+        releaseVelocity = idle < 90 ? this.ptr.drag.velocity : 0;
+      }
+      this.cube.endDrag(releaseVelocity);
     }
 
     this.ptr = this.fresh();

@@ -31,6 +31,8 @@ export class CubeScene {
   };
 
   onForceActiveChange?: (active: boolean) => void;
+  /** Fires for every executed move (drag, button, scramble, solve). */
+  onUserMove?: (move: MoveType) => void;
 
   isPhase1Completed() { return this.phase1Completed; }
   setPhase1Completed(val: boolean) { this.phase1Completed = val; }
@@ -285,7 +287,9 @@ export class CubeScene {
     const currentVis = this.computeFaceVisibility();
     const newlyHidden: FaceKey[] = [];
 
-    // Check faces that were initially visible - if they're now hidden, force them
+    // Check faces that were initially visible - if they're now hidden, force them.
+    // Each initially-visible face is forced the moment it rotates away from the
+    // camera, so the swap is never seen on screen.
     for (const face of this.initialVisibleFaces) {
       if (!currentVis[face] && !this.forcedFaces.has(face)) {
         newlyHidden.push(face);
@@ -293,10 +297,18 @@ export class CubeScene {
     }
 
     if (newlyHidden.length > 0) {
-      this.cube.applyForceSnapshot(this.forceSnapshot, newlyHidden);
-      newlyHidden.forEach(f => this.forcedFaces.add(f));
+      // Apply one-by-one so a rotating cubie's quaternion is never reset mid-turn
+      for (const face of newlyHidden) {
+        this.cube.applyForceSnapshot(this.forceSnapshot, [face]);
+        this.forcedFaces.add(face);
+      }
+    }
 
-      // Force complete - all 6 faces now have force colors
+    // Only complete once EVERY face has force colors. This means the three
+    // originally-visible faces will each get forced as they rotate out of view;
+    // when the last one is hidden and forced, all six faces are force and the
+    // sequence finishes.
+    if (this.forcedFaces.size >= 6) {
       this.forceModeActive = false;
       this.phase1Completed = false;
       this.initialVisibleFaces.clear();
@@ -307,6 +319,9 @@ export class CubeScene {
   }
 
   private handleMoveExecuted(move: MoveType) {
+    // Notify listeners of every executed move (used for the move counter).
+    this.onUserMove?.(move);
+
     // Expected presentation state check:
     // 1. Phase 1 has completed.
     // 2. Force mode is active.

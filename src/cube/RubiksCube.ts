@@ -6,7 +6,7 @@ export const GAP = 0.05;
 export const TOTAL = CUBIE_SIZE + GAP;
 const STICKER_SCALE = 0.86;
 const STICKER_DEPTH = 0.005;
-const SNAP_ANIM_DURATION = 280; // ms for snap animation after release
+const SNAP_ANIM_DURATION = 420; // ms for snap animation after release
 
 /** Complete snapshot of a single cubie for Force Cube storage */
 export interface ForceCubieSnapshot {
@@ -45,6 +45,10 @@ export class RubiksCube {
   private activeDrag: DragSession | null = null;
   private activePivot: THREE.Group | null = null;
   private moveHistory: MoveType[] = [];
+  // True while a released layer is animating to its snapped position. During
+  // this window the cubies are still parented to a pivot, so no new drag may
+  // begin until finalizeDrag reparents them.
+  private isSettling = false;
 
   constructor(scene: THREE.Scene, cubeGroup: THREE.Group, initialState: CubeStateData) {
     this.scene = scene;
@@ -64,6 +68,8 @@ export class RubiksCube {
   getState() { return this.cubeState; }
   isCurrentlyAnimating() { return this.isAnimating; }
   isDragging() { return this.activeDrag !== null; }
+  /** True if any drag, snap-settle, or programmatic animation is in progress. */
+  isBusy() { return this.isAnimating || this.activeDrag !== null || this.isSettling; }
 
   private buildCube(state: CubeStateData) {
     this.cubies.forEach(c => this.cubeGroup.remove(c.mesh));
@@ -203,7 +209,6 @@ export class RubiksCube {
     return this.activeDrag;
   }
 
-  private lastSmoothTick = 0;
 
   /**
    * Called every animation frame while dragging.
@@ -211,27 +216,24 @@ export class RubiksCube {
    * Frame-rate independent exponential smoothing.
    */
   tickDragSmoothing() {
-    if (!this.activeDrag) return;
-    const drag = this.activeDrag;
-    const now = performance.now();
-    const dt = this.lastSmoothTick ? Math.min((now - this.lastSmoothTick) / 1000, 0.033) : 0.016;
-    this.lastSmoothTick = now;
-
-    const diff = drag.targetAngle - drag.currentAngle;
-    // 12 rad/s smoothing rate — fast enough to feel responsive at any FPS
-    const lambda = 1 - Math.exp(-12 * dt);
-    if (Math.abs(diff) < 0.0005) {
-      drag.currentAngle = drag.targetAngle;
-    } else {
-      drag.currentAngle += diff * lambda;
-    }
-    drag.pivot.quaternion.setFromAxisAngle(drag.axisVec, drag.currentAngle);
+    // Finger tracking is now applied directly in setDragAngle (event-driven,
+    // decoupled from the render loop) so the drag feel is identical whether or
+    // not force mode is running per-frame work. Nothing to do here while a
+    // drag is active; kept for API compatibility.
+    return;
   }
 
-  /** Update the target angle from pointer */
+  /**
+   * Update the layer angle directly from the pointer — the layer follows the
+   * finger exactly 1:1 with no smoothing lag. Applied on every pointermove so
+   * the motion is instant and its speed never depends on the render-loop frame
+   * rate (and therefore never changes when force mode is active or has run).
+   */
   setDragAngle(angle: number) {
     if (!this.activeDrag) return;
     this.activeDrag.targetAngle = angle;
+    this.activeDrag.currentAngle = angle;
+    this.activeDrag.pivot.quaternion.setFromAxisAngle(this.activeDrag.axisVec, angle);
   }
 
   /**
@@ -241,21 +243,34 @@ export class RubiksCube {
    * visually is right now) — so the motion is always seamless.
    * Commit threshold: 45°.
    */
-  endDrag() {
+  endDrag(velocity = 0) {
     if (!this.activeDrag) return;
     const drag = this.activeDrag;
     this.activeDrag = null;
 
     const halfPi = Math.PI / 2;
     const commitThreshold = Math.PI / 4; // 45°
+    // A quick flick commits a turn even if the finger didn't travel far.
+    // velocity is in rad/ms; ~0.004 rad/ms ≈ a 90° turn in ~390ms.
+    const FLICK_VELOCITY = 0.004;
+    const FLICK_MIN_ANGLE = Math.PI / 18; // 10° — ignore accidental micro-flicks
 
     // Use targetAngle for the decision — it reflects the finger's intent
     // even if the visual (currentAngle) hasn't caught up yet due to lerp.
     const decisionAngle = drag.targetAngle;
 
-    if (Math.abs(decisionAngle) >= commitThreshold) {
-      // Commit the turn
-      const direction = decisionAngle > 0 ? 1 : -1;
+    let commit = Math.abs(decisionAngle) >= commitThreshold;
+    // Direction from the dragged distance by default.
+    let direction = decisionAngle >= 0 ? 1 : -1;
+
+    // Flick override: a fast release past a small minimum commits one turn
+    // in the direction of the flick, so a single quick swipe = one turn.
+    if (!commit && Math.abs(velocity) >= FLICK_VELOCITY && Math.abs(decisionAngle) >= FLICK_MIN_ANGLE) {
+      commit = true;
+      direction = velocity > 0 ? 1 : -1;
+    }
+
+    if (commit) {
       const targetAngle = direction * halfPi;
       const move = this.getMoveFromDrag(drag.axis, drag.layer, direction);
       this.snapDragTo(drag, targetAngle, move);
@@ -294,6 +309,9 @@ export class RubiksCube {
   }
 
   private snapDragTo(drag: DragSession, targetAngle: number, move: MoveType | null) {
+    // Lock out new interactions until the layer finishes settling.
+    this.isSettling = true;
+
     const startAngle = drag.currentAngle;
     const startQuat = new THREE.Quaternion().setFromAxisAngle(drag.axisVec, startAngle);
     const targetQuat = new THREE.Quaternion().setFromAxisAngle(drag.axisVec, targetAngle);
@@ -306,16 +324,14 @@ export class RubiksCube {
     }
 
     const startTime = performance.now();
-    // Duration proportional to remaining angle, minimum 80ms for feel
-    const duration = Math.max(80, SNAP_ANIM_DURATION * (diff / (Math.PI / 2)));
+    // Duration proportional to remaining angle, minimum 140ms for a smooth feel
+    const duration = Math.max(140, SNAP_ANIM_DURATION * (diff / (Math.PI / 2)));
 
     const tick = (now: number) => {
       const t = Math.min((now - startTime) / duration, 1);
-      // easeInOut — starts smooth (continuing the swipe momentum)
-      // and decelerates into the final position
-      const eased = t < 0.5
-        ? 2 * t * t
-        : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      // easeOutCubic — carries the swipe momentum forward and gently
+      // decelerates into the final snapped position for a smooth completion.
+      const eased = 1 - Math.pow(1 - t, 3);
       drag.pivot.quaternion.slerpQuaternions(startQuat, targetQuat, eased);
       if (t < 1) {
         requestAnimationFrame(tick);
@@ -367,6 +383,10 @@ export class RubiksCube {
     }
 
     this.cubeGroup.remove(drag.pivot);
+
+    // Layer is fully reparented and snapped — safe to accept new input again.
+    this.isSettling = false;
+
     this.onStateChangeCb?.(this.cubeState);
     if (move) {
       this.onMoveCb?.(move);

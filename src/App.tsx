@@ -21,17 +21,17 @@ function ForcePanel({
     onClose: () => void; 
     cubeScene: CubeScene | null; 
   }) {
-    if (!isOpen) return null;
-
     const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
     const [status, setStatus] = useState<string>('');
 
-    // Sync with cubeScene on mount
+    // Sync with cubeScene whenever the panel opens
     useEffect(() => {
-      if (cubeScene) {
+      if (isOpen && cubeScene) {
         setForceSnapshotExists(!!cubeScene.getForceSnapshot());
       }
-    }, [cubeScene]);
+    }, [cubeScene, isOpen]);
+
+    if (!isOpen) return null;
 
     const handleSetSnapshot = () => {
       if (!cubeScene) return;
@@ -44,7 +44,6 @@ function ForcePanel({
       if (!cubeScene) return;
       cubeScene.clearForceSnapshot();
       setForceSnapshotExists(false);
-      setForceActive(false);
       setStatus('Force Cube cleared');
     };
 
@@ -57,6 +56,10 @@ function ForcePanel({
           </div>
 
           <div className="force-panel-content">
+            <div className="force-status">
+              Force Cube: {forceSnapshotExists ? 'STORED ✓' : 'none'}
+            </div>
+
             <div className="force-buttons">
               <button onClick={handleSetSnapshot} className="force-btn">
                 Snapshot Force Cube (Exact Copy)
@@ -88,7 +91,7 @@ export default function App() {
   const [solving, setSolving] = useState(false);
   const [showSolvedBanner, setShowSolvedBanner] = useState(false);
   const [showForcePanel, setShowForcePanel] = useState(false);
-  const [forceActive, setForceActive] = useState(false);
+  const [, setForceActive] = useState(false);
   const scrambleRef = useRef(false);
   const solveRef = useRef(false);
   const titlePressTimer = useRef<number | null>(null);
@@ -106,6 +109,9 @@ export default function App() {
       }
     });
     scene.onForceActiveChange = setForceActive;
+    // Single source of truth for the move counter: every executed move
+    // (drag, panel button, scramble step, solve step) increments it.
+    scene.onUserMove = () => setMoveCount(prev => prev + 1);
     return () => {
       if (titlePressTimer.current) clearTimeout(titlePressTimer.current);
       scene.destroy(); cubeSceneRef.current = null;
@@ -134,10 +140,9 @@ export default function App() {
       let move: MoveType;
       do { move = SCRAMBLE_MOVES[Math.floor(Math.random() * SCRAMBLE_MOVES.length)]; } while (move[0] === lastFace);
       lastFace = move[0];
-      cubeSceneRef.current?.executeMove(move);
-      count++;
-      setMoveCount(count);
-      setTimeout(next, 90);
+    cubeSceneRef.current?.executeMove(move);
+    count++;
+    setTimeout(next, 90);
     };
     next();
   }, [scrambling, solving]);
@@ -157,7 +162,6 @@ export default function App() {
       }
       cubeSceneRef.current?.executeSolveMove(sequence[index]);
       index++;
-      setMoveCount(prev => prev + 1);
       setTimeout(next, 220);
     };
     next();
@@ -178,7 +182,6 @@ export default function App() {
   const handleMove = useCallback((move: MoveType) => {
     if (!cubeSceneRef.current) return;
     cubeSceneRef.current.executeMove(move);
-    setMoveCount(prev => prev + 1);
     setSolved(false);
   }, []);
 
