@@ -5,6 +5,7 @@ import { isSolved, MoveType, CubeStateData } from './cube/CubeState';
 const PRESET_STORAGE_KEY = 'cubemix_presets';
 const MAX_PRESETS = 5;
 const BG_STORAGE_KEY = 'cubemix_bg';
+const SHOW_TITLE_KEY = 'cubemix_show_title';
 
 interface Preset {
   id: string;
@@ -46,11 +47,13 @@ function applyBackground(url: string) {
 function ForcePanel({ 
     isOpen, 
     onClose, 
-    cubeScene, 
+    cubeScene,
+    onTitleToggle,
   }: { 
     isOpen: boolean; 
     onClose: () => void; 
-    cubeScene: CubeScene | null; 
+    cubeScene: CubeScene | null;
+    onTitleToggle: (show: boolean) => void;
   }) {
     const [forceSnapshotExists, setForceSnapshotExists] = useState(false);
     const [status, setStatus] = useState<string>('');
@@ -58,6 +61,7 @@ function ForcePanel({
     const [namingSlot, setNamingSlot] = useState<string | null>(null);
     const [nameInput, setNameInput] = useState('');
     const [bgUrl, setBgUrl] = useState<string>(() => localStorage.getItem(BG_STORAGE_KEY) ?? '');
+    const [showTitle, setShowTitle] = useState<boolean>(() => localStorage.getItem(SHOW_TITLE_KEY) !== 'false');
     const bgInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -68,6 +72,7 @@ function ForcePanel({
         setNamingSlot(null);
         setNameInput('');
         setBgUrl(localStorage.getItem(BG_STORAGE_KEY) ?? '');
+        setShowTitle(localStorage.getItem(SHOW_TITLE_KEY) !== 'false');
       }
     }, [cubeScene, isOpen]);
 
@@ -90,6 +95,13 @@ function ForcePanel({
       setBgUrl('');
       applyBackground('');
       setStatus('Pozadie odstránené');
+    };
+
+    const handleTitleToggle = () => {
+      const next = !showTitle;
+      setShowTitle(next);
+      localStorage.setItem(SHOW_TITLE_KEY, String(next));
+      onTitleToggle(next);
     };
 
     if (!isOpen) return null;
@@ -202,6 +214,23 @@ function ForcePanel({
             {/* ── Divider ── */}
             <div className="force-divider" />
 
+            {/* ── Title visibility section ── */}
+            <div className="force-section-title">Nápis</div>
+            <div className="title-toggle-row">
+              <span className="title-toggle-label">Zobraziť nápis v hornej lište</span>
+              <button
+                className={`toggle-switch ${showTitle ? 'toggle-on' : ''}`}
+                onClick={handleTitleToggle}
+                aria-pressed={showTitle}
+                aria-label="Zobraziť nápis"
+              >
+                <span className="toggle-knob" />
+              </button>
+            </div>
+
+            {/* ── Divider ── */}
+            <div className="force-divider" />
+
             {/* ── Preset snapshots section ── */}
             <div className="force-section-title">Presety kocky</div>
 
@@ -260,20 +289,22 @@ function SidePanel({
   onClose,
   onScramble,
   onSolve,
+  onReset,
   scrambling,
   solving,
   solved,
+  busy,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onScramble: () => void;
   onSolve: () => void;
+  onReset: () => void;
   scrambling: boolean;
   solving: boolean;
   solved: boolean;
+  busy: boolean;
 }) {
-  const busy = scrambling || solving;
-
   if (!isOpen) return null;
 
   return (
@@ -310,6 +341,17 @@ function SidePanel({
             </svg>
             <span>{solving ? 'Solving...' : 'Solve'}</span>
           </button>
+
+          <button
+            className="drawer-action-btn drawer-action-reset"
+            onClick={() => { onReset(); onClose(); }}
+            disabled={busy}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            <span>Reset</span>
+          </button>
         </div>
       </div>
     </>
@@ -326,6 +368,7 @@ export default function App() {
     const saved = localStorage.getItem(BG_STORAGE_KEY);
     if (saved) applyBackground(saved);
   }, []);
+  const [showTitle, setShowTitle] = useState<boolean>(() => localStorage.getItem(SHOW_TITLE_KEY) !== 'false');
   const [showPanel, setShowPanel] = useState(false);
   const [scrambling, setScrambling] = useState(false);
   const [solving, setSolving] = useState(false);
@@ -458,16 +501,18 @@ export default function App() {
             <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        <span 
-          className="topbar-title" 
-          onMouseDown={onTitleMouseDown}
-          onMouseUp={onTitleMouseUp}
-          onMouseLeave={onTitleMouseUp}
-          onTouchStart={onTitleMouseDown}
-          onTouchEnd={onTitleMouseUp}
-        >
-          CUBEMIX
-        </span>
+        {showTitle && (
+          <span 
+            className="topbar-title" 
+            onMouseDown={onTitleMouseDown}
+            onMouseUp={onTitleMouseUp}
+            onMouseLeave={onTitleMouseUp}
+            onTouchStart={onTitleMouseDown}
+            onTouchEnd={onTitleMouseUp}
+          >
+            CUBEMIX
+          </span>
+        )}
         <div className="topbar-stats" />
       </header>
 
@@ -481,25 +526,17 @@ export default function App() {
         <div className="canvas-wrap" ref={mountRef} />
       </div>
 
-      {/* Bottom toolbar — Reset only */}
-      <div className="toolbar">
-        <button className="tool" onClick={handleReset} disabled={busy}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-          </svg>
-          <span>Reset</span>
-        </button>
-      </div>
-
-      {/* Side panel with Scramble + Solve */}
+      {/* Side panel with Scramble + Solve + Reset */}
       <SidePanel
         isOpen={showPanel}
         onClose={() => setShowPanel(false)}
         onScramble={handleScramble}
         onSolve={handleSolve}
+        onReset={handleReset}
         scrambling={scrambling}
         solving={solving}
         solved={solved}
+        busy={busy}
       />
 
       {/* Force Panel */}
@@ -507,6 +544,7 @@ export default function App() {
         isOpen={showForcePanel}
         onClose={() => setShowForcePanel(false)}
         cubeScene={cubeSceneRef.current}
+        onTitleToggle={setShowTitle}
       />
     </div>
   );
