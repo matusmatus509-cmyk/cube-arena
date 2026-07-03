@@ -174,8 +174,8 @@ html, body {
 
 .canvas-wrap {
   /* Fixed square, slightly smaller than viewport — centered */
-  width: min(94vw, 84vh, 640px);
-  height: min(94vw, 84vh, 640px);
+  width: min(98vw, 92vh, 760px);
+  height: min(98vw, 92vh, 760px);
   flex-shrink: 0;
   cursor: grab;
   overflow: hidden;
