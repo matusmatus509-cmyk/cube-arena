@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/cube-arena/',
+  base: '/',
   plugins: [
     react(),
     tailwindcss(),
@@ -27,8 +27,8 @@ export default defineConfig({
         background_color: '#0e0e12',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/cube-arena/',
-        scope: '/cube-arena/',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: 'icon.svg',
